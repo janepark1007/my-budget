@@ -86,13 +86,18 @@
 .misc-mint small,.misc-mint b{color:#134e4a!important}
 .misc-summary-mint{background:#e6fffa;border-radius:10px;padding:8px 10px!important;color:#115e59}
 
+
+.card-mint{background:#e8fbf5!important;border:2px solid #a7e7d7!important;color:#134e4a!important}
+.card-mint small,.card-mint b{color:#134e4a!important}
+.sum-mint{background:#effcf8;border-radius:10px;padding:8px 10px!important;color:#115e59}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-대출적색</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-민트통일</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -102,27 +107,27 @@
 
   <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
     <div class="cards">
-      <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
-      <div class="card"><small>총지출</small><b id="sumExpense">0원</b></div>
+      <div class="card card-mint"><small>총수입</small><b id="sumIncome">0원</b></div>
+      <div class="card card-mint"><small>총지출</small><b id="sumExpense">0원</b></div>
       <div class="card loan-red"><small>대출지출 총금액</small><b id="sumLoans">0원</b></div>
-      <div class="card"><small>공과금</small><b id="sumUtilities">0원</b></div>
-      <div class="card"><small>보험지출 총금액</small><b id="sumInsurance">0원</b></div>
+      <div class="card card-mint"><small>공과금</small><b id="sumUtilities">0원</b></div>
+      <div class="card card-mint"><small>보험지출 총금액</small><b id="sumInsurance">0원</b></div>
       <div class="card academy-yellow"><small>학원비 총지출</small><b id="sumAcademy">0원</b></div>
       <div class="card misc-mint"><small>기타지출</small><b id="sumMisc">0원</b></div>
-      <div class="card"><small>부업 투자지출</small><b id="sumInvest">0원</b></div>
+      <div class="card card-mint"><small>부업 투자지출</small><b id="sumInvest">0원</b></div>
       <div class="card saving-card-green"><small>적금</small><b id="sumSaving">0원</b></div>
       <div class="card wide"><small>이번 달 남는 돈</small><b id="sumBalance">0원</b></div>
     </div>
     <div class="section"><h2>이번 달 정리</h2>
-      <div class="sum"><span>수입</span><b id="rIncome">0원</b></div>
+      <div class="sum sum-mint"><span>수입</span><b id="rIncome">0원</b></div>
       <div class="sum loan-summary"><span>대출지출</span><b id="rLoans">0원</b></div>
-      <div class="sum"><span>공과금</span><b id="rUtilities">0원</b></div>
-      <div class="sum"><span>보험지출</span><b id="rInsurance">0원</b></div>
+      <div class="sum sum-mint"><span>공과금</span><b id="rUtilities">0원</b></div>
+      <div class="sum sum-mint"><span>보험지출</span><b id="rInsurance">0원</b></div>
       <div class="sum academy-summary"><span>학원비</span><b id="rAcademy">0원</b></div>
       <div class="sum misc-summary-mint"><span>기타지출</span><b id="rMisc">0원</b></div>
-      <div class="sum"><span>부업 투자지출</span><b id="rInvest">0원</b></div>
+      <div class="sum sum-mint"><span>부업 투자지출</span><b id="rInvest">0원</b></div>
       <div class="sum saving-summary-green"><span>적금</span><b id="rSaving">0원</b></div>
-      <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
+      <div class="sum sum-mint"><span>남는 돈</span><b id="rBalance">0원</b></div>
     </div>
     
     <div class="section">
