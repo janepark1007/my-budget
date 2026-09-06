@@ -17,7 +17,7 @@
 .row{display:grid;grid-template-columns:1fr 112px 36px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}
 .money{width:100%;height:40px;border:1px solid #d1d5db;border-radius:10px;background:var(--yellow);text-align:right;padding:0 9px;font-size:15px}
 .check{width:32px;height:32px;border:2px solid #cbd5e1;border-radius:9px;background:#fff;font-size:17px}.check.done{background:#d1fae5;border-color:#34d399}.paidHidden{display:none}
-.bank{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr;gap:7px;align-items:center}.bank input,.textinput,.dateinput{height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px;background:#fff}
+.bank{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr;gap:7px;align-items:center}.fixed-edit{grid-column:1/-1;display:grid;grid-template-columns:1fr 78px;gap:7px;margin-top:4px}.fixed-edit input{height:34px;border:1px solid #d1d5db;border-radius:8px;padding:0 8px}.fixed-edit button{border:0;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:800}.bank input,.textinput,.dateinput{height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px;background:#fff}
 .bank label{font-size:12px;color:var(--muted)}
 .manual{display:grid;grid-template-columns:82px 1fr 100px 32px;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.manual .memo{grid-column:1/-1}
 .del{height:30px;border:0;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:900}.addbox{display:grid;grid-template-columns:92px 1fr 100px;gap:7px;margin-top:10px}.addbox input{height:40px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px}.addbox .memoAdd{grid-column:1/3}.addbox button{grid-column:3;grid-row:1/3;border:0;border-radius:9px;background:#eef2ff;font-weight:800}
@@ -64,6 +64,13 @@
       <h2>고정지출 <span><button id="saveFixed" class="smallbtn">고정지출 저장</button> <button id="togglePaid" class="smallbtn">결제완료 보기</button></span></h2>
       <div id="fixedSaveStatus" class="sub" style="margin-bottom:8px">입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.</div>
       <div id="fixedList"></div>
+      <div class="addbox" style="margin-top:12px">
+        <input id="newFixedCategory" placeholder="구분 예: 통신비">
+        <input id="newFixedName" placeholder="고정지출 항목명">
+        <input id="newFixedAmount" inputmode="numeric" placeholder="금액">
+        <input id="newFixedBank" class="memoAdd" placeholder="결제은행">
+        <button id="addFixed">추가</button>
+      </div>
     </div>
     <div class="section">
       <h2>부업 투자지출</h2><div class="sub">장비, 광고비, 재료비, 프로그램·구독료 등</div>
@@ -107,7 +114,16 @@
 <script>
 'use strict';
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
-const fixedItems=[['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],['공과금','전기'],['공과금','가스'],['교육','웅진씽크빅 용하'],['교육','웅진씽빅 태하'],['보험','한화보험']];
+const defaultFixedItems=[
+['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],
+['공과금','전기'],['공과금','가스'],['교육','웅진씽크빅 용하'],['교육','웅진씽빅 태하'],['보험','한화보험']
+];
+function getFixedItems(){
+  const master=loadFixedMaster();
+  const custom=Object.entries(master).map(([name,r])=>[r.category||'고정지출',name]);
+  if(custom.length) return custom;
+  return defaultFixedItems;
+}
 const debtNames=['디딤돌','신용대출','우리대출','오케이대출1','오케이대출2','롯데대출'];
 const miscDefaults=['식비','교통비','주유비','생활용품','병원·약국','용돈','경조사'];
 
@@ -167,7 +183,7 @@ function saveFixedMaster(fixed){
 function applyFixedMaster(d){
   const master=loadFixedMaster();
   d.fixed=d.fixed||{};
-  fixedItems.forEach(([,n])=>{
+  getFixedItems().forEach(([cat,n])=>{
     if(!d.fixed[n]) d.fixed[n]={};
     const m=master[n]||{};
     if((d.fixed[n].amount===undefined || d.fixed[n].amount===null || d.fixed[n].amount==='') && m.amount!==undefined) d.fixed[n].amount=m.amount;
@@ -208,14 +224,33 @@ function renderAll(){
   incomeList.innerHTML='';fixedList.innerHTML='';savingList.innerHTML='';
   incomes.forEach(n=>incomeList.appendChild(makeMoneyRow(n,'수입',d.income[n],false,
     v=>{const x=loadData();x.income[n]=v;saveData(x);updateSummary()},null,false,'',null)));
-  fixedItems.forEach(([cat,n])=>{
+  getFixedItems().forEach(([cat,n])=>{
     const r=d.fixed[n]||{};
-    fixedList.appendChild(makeMoneyRow(n,cat,r.amount,r.paid,
-      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),amount:v};saveData(x);const master=loadFixedMaster();master[n]={...(master[n]||{}),amount:v,bank:x.fixed[n].bank||master[n]?.bank||''};saveFixedMaster(master);updateSummary()},
+    const master=loadFixedMaster();
+    const row=makeMoneyRow(n,cat,r.amount,r.paid,
+      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),amount:v};saveData(x);const mm=loadFixedMaster();mm[n]={...(mm[n]||{}),amount:v,bank:x.fixed[n].bank||mm[n]?.bank||'',category:mm[n]?.category||cat};saveFixedMaster(mm);updateSummary()},
       ()=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),paid:!x.fixed[n]?.paid};saveData(x);renderAll()},
       true,r.bank,
-      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),bank:v};saveData(x);const master=loadFixedMaster();master[n]={...(master[n]||{}),bank:v,amount:x.fixed[n].amount??master[n]?.amount??0};saveFixedMaster(master)}
-    ));
+      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),bank:v};saveData(x);const mm=loadFixedMaster();mm[n]={...(mm[n]||{}),bank:v,amount:x.fixed[n].amount??mm[n]?.amount??0,category:mm[n]?.category||cat};saveFixedMaster(mm)}
+    );
+    const edit=document.createElement('div');edit.className='fixed-edit';
+    const nameInp=document.createElement('input');nameInp.value=n;nameInp.placeholder='항목명';
+    const del=document.createElement('button');del.textContent='삭제';
+    nameInp.onchange=()=>{
+      const newName=nameInp.value.trim();
+      if(!newName || newName===n) return;
+      const x=loadData(); const mm=loadFixedMaster();
+      x.fixed[newName]={...(x.fixed[n]||{})}; delete x.fixed[n];
+      mm[newName]={...(mm[n]||{}),category:mm[n]?.category||cat}; delete mm[n];
+      saveData(x); saveFixedMaster(mm); renderAll();
+    };
+    del.onclick=()=>{
+      if(!confirm(`${n} 항목을 삭제할까요?`)) return;
+      const x=loadData(); const mm=loadFixedMaster();
+      delete x.fixed[n]; delete mm[n];
+      saveData(x); saveFixedMaster(mm); renderAll();
+    };
+    edit.append(nameInp,del); row.appendChild(edit); fixedList.appendChild(row);
   });
   savingList.appendChild(makeMoneyRow('한화적금','적금',d.saving['한화적금'],false,
     v=>{const x=loadData();x.saving['한화적금']=v;saveData(x);updateSummary()},null,false,'',null));
@@ -246,7 +281,7 @@ function renderInvest(){
 function updateSummary(){
   const d=loadData();let inc=0,fix=0,misc=0,inv=0,sav=0;
   Object.values(d.income).forEach(v=>inc+=Number(v)||0);
-  fixedItems.forEach(([,n])=>fix+=Number(d.fixed[n]?.amount)||0);
+  getFixedItems().forEach(([,n])=>fix+=Number(d.fixed[n]?.amount)||0);
   d.misc.forEach(r=>misc+=Number(r.amount)||0);
   d.invest.forEach(r=>inv+=Number(r.amount)||0);
   Object.values(d.saving).forEach(v=>sav+=Number(v)||0);
@@ -284,13 +319,29 @@ function updateDebtSummary(){
 saveFixed.onclick=()=>{
   const d=loadData();
   const master={};
-  fixedItems.forEach(([,n])=>{
+  getFixedItems().forEach(([cat,n])=>{
     const r=d.fixed[n]||{};
-    master[n]={amount:Number(r.amount)||0,bank:r.bank||''};
+    master[n]={...(master[n]||{}),amount:Number(r.amount)||0,bank:r.bank||'',category:master[n]?.category||cat};
   });
   saveFixedMaster(master);
   fixedSaveStatus.textContent='✅ 고정지출이 영구저장되었습니다. 다음 달과 웹 업데이트 후에도 불러옵니다.';
   setTimeout(()=>{fixedSaveStatus.textContent='입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.'},3500);
+};
+
+
+newFixedAmount.addEventListener('input',()=>newFixedAmount.value=formatInput(newFixedAmount.value));
+addFixed.onclick=()=>{
+  const name=newFixedName.value.trim();
+  if(!name) return alert('고정지출 항목명을 입력하세요.');
+  const cat=newFixedCategory.value.trim()||'고정지출';
+  const amount=onlyNumber(newFixedAmount.value);
+  const bank=newFixedBank.value.trim();
+  const x=loadData(); const master=loadFixedMaster();
+  x.fixed[name]={amount,bank,paid:false};
+  master[name]={amount,bank,category:cat};
+  saveData(x); saveFixedMaster(master);
+  newFixedCategory.value='';newFixedName.value='';newFixedAmount.value='';newFixedBank.value='';
+  renderAll();
 };
 
 togglePaid.onclick=()=>{showPaid=!showPaid;togglePaid.textContent=showPaid?'결제완료 숨기기':'결제완료 보기';renderAll()};
