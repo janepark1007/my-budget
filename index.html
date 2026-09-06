@@ -21,7 +21,7 @@
 .bank label{font-size:12px;color:var(--muted)}
 .manual{display:grid;grid-template-columns:82px 1fr 100px 32px;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.manual .memo{grid-column:1/-1}
 .del{height:30px;border:0;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:900}.addbox{display:grid;grid-template-columns:92px 1fr 100px;gap:7px;margin-top:10px}.addbox input{height:40px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px}.addbox .memoAdd{grid-column:1/3}.addbox button{grid-column:3;grid-row:1/3;border:0;border-radius:9px;background:#eef2ff;font-weight:800}
-.smallbtn{border:0;border-radius:9px;background:#eef2ff;font-weight:800;padding:8px 10px}.sum{display:flex;justify-content:space-between;padding:6px 0}.sum b{font-size:17px}
+.smallbtn{border:0;border-radius:9px;background:#eef2ff;font-weight:800;padding:8px 10px}.sum{display:flex;justify-content:space-between;padding:6px 0}.sum b{font-size:17px}.compare{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.compare th,.compare td{border-bottom:1px solid var(--line);padding:9px 6px;text-align:right}.compare th:first-child,.compare td:first-child{text-align:left}.compare th{background:#f8fafc;font-weight:800}.up{color:#b91c1c;font-weight:800}.down{color:#166534;font-weight:800}.same{color:#6b7280;font-weight:700}
 .note{background:#fff7ed;border-left:4px solid #fb923c;border-radius:10px;padding:12px;font-size:13px;line-height:1.5}.good{color:#166534}.bad{color:#b91c1c}
 .page{display:none}.page.active{display:block}.bottom{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:20}
 .tabs{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.tab{border:0;border-radius:10px;background:#eef2f7;padding:10px 3px;font-size:12px;font-weight:800}.tab.active{background:var(--navy);color:#fff}
@@ -55,7 +55,18 @@
       <div class="sum"><span>적금</span><b id="rSaving">0원</b></div>
       <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
     </div>
-    <div class="note">기존 입력값은 같은 브라우저에서 자동 복구합니다. 고정지출은 별도 영구저장되어 웹 파일을 업데이트해도 유지됩니다.</div>
+    
+    <div class="section">
+      <h2>전월 대비 수입·지출 비교</h2>
+      <div id="compareTitle" class="sub" style="margin-bottom:8px"></div>
+      <table class="compare">
+        <thead>
+          <tr><th>구분</th><th>전월</th><th>이번 달</th><th>증감</th></tr>
+        </thead>
+        <tbody id="compareBody"></tbody>
+      </table>
+    </div>
+<div class="note">기존 입력값은 같은 브라우저에서 자동 복구합니다. 고정지출은 별도 영구저장되어 웹 파일을 업데이트해도 유지됩니다.</div>
   </section>
 
   <section id="fixedPage" class="page">
@@ -140,6 +151,54 @@ const fixedMasterKey='mybudget_fixed_master';
 const won=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
 const onlyNumber=v=>Number(String(v??'').replace(/,/g,'').replace(/[^0-9]/g,''))||0;
 const formatInput=v=>{const s=String(v??'').replace(/,/g,'').replace(/[^0-9]/g,'');return s?Number(s).toLocaleString('ko-KR'):''};
+function monthKey(y,m){return `mybudget_month_${y}_${m}`}
+function previousYM(){
+  let y=Number(yearEl.value), m=Number(monthEl.value)-1;
+  if(m===0){m=12;y--}
+  return {y,m};
+}
+function readMonthData(y,m){
+  const raw=localStorage.getItem(monthKey(y,m));
+  if(!raw) return null;
+  try{return migrateShape(JSON.parse(raw))}catch(e){return null}
+}
+function calcMonthSummary(d){
+  if(!d) return {income:0,fixed:0,misc:0,invest:0,saving:0,expense:0,balance:0};
+  d=migrateShape(d);
+  let income=0,fixed=0,misc=0,invest=0,saving=0;
+  Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
+  getFixedItems().forEach(([,n])=>fixed+=Number(d.fixed?.[n]?.amount)||0);
+  (d.misc||[]).forEach(r=>misc+=Number(r.amount)||0);
+  (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
+  Object.values(d.saving||{}).forEach(v=>saving+=Number(v)||0);
+  const expense=fixed+misc+invest+saving;
+  return {income,fixed,misc,invest,saving,expense,balance:income-expense};
+}
+function renderComparison(){
+  const cur=calcMonthSummary(loadData());
+  const p=previousYM();
+  const prev=calcMonthSummary(readMonthData(p.y,p.m));
+  compareTitle.textContent=`${p.y}년 ${p.m}월 ↔ ${yearEl.value}년 ${monthEl.value}월`;
+  const rows=[
+    ['수입','income'],
+    ['총지출','expense'],
+    ['고정지출','fixed'],
+    ['기타지출','misc'],
+    ['부업 투자지출','invest'],
+    ['적금','saving'],
+    ['남는 돈','balance']
+  ];
+  compareBody.innerHTML='';
+  rows.forEach(([label,key])=>{
+    const diff=cur[key]-prev[key];
+    const tr=document.createElement('tr');
+    const cls=diff>0?'up':diff<0?'down':'same';
+    const sign=diff>0?'+':'';
+    tr.innerHTML=`<td>${label}</td><td>${won(prev[key])}</td><td>${won(cur[key])}</td><td class="${cls}">${sign}${won(diff)}</td>`;
+    compareBody.appendChild(tr);
+  });
+}
+
 
 function emptyData(){return {income:{},fixed:{},saving:{},misc:[],invest:[],seeded:false}}
 function migrateShape(d){
@@ -291,6 +350,7 @@ function updateSummary(){
   sumInvest.textContent=rInvest.textContent=won(inv);sumSaving.textContent=rSaving.textContent=won(sav);
   sumBalance.textContent=rBalance.textContent=won(bal);
   sumBalance.className=rBalance.className=bal<0?'bad':'good';
+  renderComparison();
 }
 function renderDebts(){
   const d=JSON.parse(localStorage.getItem(debtKey)||'{}');debtList.innerHTML='';
