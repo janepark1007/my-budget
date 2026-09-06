@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>우리집 가계부</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;background:#f5f7fb;color:#1f2937}.wrap{max-width:760px;margin:auto;padding:12px 12px 88px}.top{background:#203864;color:#fff;border-radius:20px;padding:18px}.top h1{margin:0 0 8px;font-size:22px}.top p{margin:0;font-size:13px;opacity:.9}.month{display:flex;gap:8px;margin-top:14px}.month select,.month button{height:42px;border:0;border-radius:10px;padding:0 12px}.month select{flex:1}.month button{font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.card,.section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 12px #0000000d}.card b{font-size:20px}.wide{grid-column:1/-1;background:#e8f5e9}.wide b{font-size:24px}.section{margin:12px 0}.section h2{margin:0 0 10px;font-size:17px}.row{display:grid;grid-template-columns:1fr 110px 36px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #e5e7eb}.row:last-child{border-bottom:0}.name{font-size:15px}.sub{font-size:11px;color:#6b7280}.money{width:100%;height:40px;border:1px solid #d1d5db;border-radius:10px;background:#fff4cc;text-align:right;padding:0 8px}.check{width:32px;height:32px;border:2px solid #cbd5e1;border-radius:9px;background:#fff}.done{background:#d1fae5;border-color:#34d399}.hidden{display:none}.manual{display:grid;grid-template-columns:78px 1fr 100px 32px;gap:7px;align-items:center;padding:9px 0;border-bottom:1px solid #e5e7eb}.manual .memo{grid-column:1/-1;height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px;background:#fff}.manual .date{height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 5px;background:#fff}.del{border:0;border-radius:8px;background:#fee2e2;color:#b91c1c;height:30px}.add{display:grid;grid-template-columns:92px 1fr 100px;gap:7px;margin-top:10px}.add .memoadd{grid-column:1/3}.add button{grid-column:3;grid-row:1/3}.add input{height:40px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px}.add button,.small{border:0;border-radius:9px;background:#eef2ff;font-weight:700}.sum{display:flex;justify-content:space-between;padding:6px 0}.page{display:none}.page.active{display:block}.bottom{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:8px}.tabs{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.tab{border:0;border-radius:10px;padding:10px 3px;font-size:12px;font-weight:700}.tab.active{background:#203864;color:#fff}.good{color:#166534}.bad{color:#b91c1c}.tip{background:#fff7ed;border-left:4px solid #fb923c;padding:12px;border-radius:10px;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>우리집 빚갚는 가계부</h1>
+    <p>고정지출은 빠짐없이, 기본지출은 직접 입력</p>
+    <div class="month"><select id="month"></select><button id="reset">이번 달 초기화</button></div>
+  </div>
+
+  <section id="home" class="page active">
+    <div class="grid">
+      <div class="card">총수입<br><b id="tIncome">0원</b></div>
+      <div class="card">총지출<br><b id="tExpense">0원</b></div>
+      <div class="card">고정지출<br><b id="tFixed">0원</b></div>
+      <div class="card">기본지출<br><b id="tBasic">0원</b></div>
+      <div class="card">적금<br><b id="tSaving">0원</b></div>
+      <div class="card">미결제<br><b id="tUnpaid">0건</b></div>
+      <div class="card wide">이번 달 남는 돈<br><b id="tBalance">0원</b></div>
+    </div>
+    <div class="section"><h2>이번 달 정리</h2>
+      <div class="sum"><span>수입</span><b id="sIncome">0원</b></div>
+      <div class="sum"><span>고정지출</span><b id="sFixed">0원</b></div>
+      <div class="sum"><span>기본지출</span><b id="sBasic">0원</b></div>
+      <div class="sum"><span>적금</span><b id="sSaving">0원</b></div>
+      <div class="sum"><span>남는 돈</span><b id="sBalance">0원</b></div>
+    </div>
+    <div class="tip">월급 입력 → 고정지출 결제체크 → 기본지출 직접 추가 → 적금 입력 → 남는 돈 확인 순서로 쓰면 됩니다.</div>
+  </section>
+
+  <section id="fixed" class="page">
+    <div class="section"><h2>수입</h2><div id="incomeList"></div></div>
+    <div class="section"><h2>고정지출 <button class="small" id="showPaid">결제완료 보기</button></h2><div id="fixedList"></div></div>
+    <div class="section"><h2>적금</h2><div id="savingList"></div></div>
+  </section>
+
+  <section id="basic" class="page">
+    <div class="section"><h2>기본지출 · 수동입력</h2>
+      <div class="sub" style="margin-bottom:8px">예: 식비, 교통비, 주유비, 병원비, 쇼핑, 용돈</div>
+      <div id="basicList"></div>
+      <div class="add"><input id="basicName" placeholder="항목"><input id="basicAmount" type="number" inputmode="numeric" placeholder="금액"><button id="addBasic">추가</button></div>
+    </div>
+  </section>
+
+  <section id="debt" class="page">
+    <div class="section"><h2>빚 상환 계획</h2><div id="debtList"></div>
+      <div class="sum"><span>현재 총 빚</span><b id="dTotal">0원</b></div>
+      <div class="sum"><span>월 최소상환</span><b id="dMin">0원</b></div>
+      <div class="sum"><span>월 추가상환</span><b id="dExtra">0원</b></div>
+    </div>
+  </section>
+</div>
+<div class="bottom"><div class="tabs">
+<button class="tab active" data-page="home">한눈에보기</button>
+<button class="tab" data-page="fixed">수입·고정</button>
+<button class="tab" data-page="basic">기본지출</button>
+<button class="tab" data-page="debt">빚상환</button>
+</div></div>
+<script>
+const incomes=['나월급','신랑월급','부업','유튜브수입'];
+const fixed=[['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],['공과금','전기'],['공과금','가스'],['교육','웅진씽크빅 용하'],['교육','웅진씽크빅 태하'],['보험','한화보험']];
+const savings=['한화적금'];
+const debts=['디딤돌','신용대출','우리대출','오케이대출1','오케이대출2','롯데대출'];
+const month=document.getElementById('month');for(let i=1;i<=12;i++){let o=document.createElement('option');o.value=i;o.textContent=i+'월';month.appendChild(o)}month.value=new Date().getMonth()+1;
+let paidView=false; const key=()=>`budget_v5_${month.value}`, debtKey='budget_v5_debts';
+const load=()=>JSON.parse(localStorage.getItem(key())||'{"income":{},"fixed":{},"saving":{},"basic":[]}');
+const save=x=>localStorage.setItem(key(),JSON.stringify(x));
+const won=x=>(Number(x)||0).toLocaleString('ko-KR')+'원';
+function rowEl(name,sub,val,paid,onInput,onCheck,checkable){let r=document.createElement('div');r.className='row'+(paid&&!paidView&&checkable?' hidden':'');let l=document.createElement('div');l.innerHTML=`<div class="name">${name}</div><div class="sub">${sub}</div>`;let i=document.createElement('input');i.className='money';i.type='number';i.inputMode='numeric';i.value=val||'';i.placeholder='0';i.oninput=()=>onInput(i.value);let c=document.createElement('button');if(checkable){c.className='check '+(paid?'done':'');c.textContent=paid?'✓':'';c.onclick=onCheck}else c.style.visibility='hidden';r.append(l,i,c);return r}
+function render(){let d=load();incomeList.innerHTML='';fixedList.innerHTML='';savingList.innerHTML='';
+incomes.forEach(n=>incomeList.appendChild(rowEl(n,'수입',d.income[n],false,v=>{let x=load();x.income[n]=Number(v||0);save(x);summary()},null,false)));
+fixed.forEach(([cat,n])=>{let rec=d.fixed[n]||{};fixedList.appendChild(rowEl(n,cat,rec.amount,rec.paid,v=>{let x=load();x.fixed[n]={...(x.fixed[n]||{}),amount:Number(v||0)};save(x);summary()},()=>{let x=load();x.fixed[n]={...(x.fixed[n]||{}),paid:!x.fixed[n]?.paid,amount:Number(x.fixed[n]?.amount||0)};save(x);render()},true))});
+savings.forEach(n=>savingList.appendChild(rowEl(n,'적금',d.saving[n],false,v=>{let x=load();x.saving[n]=Number(v||0);save(x);summary()},null,false)));renderBasic();summary()}
+function renderBasic(){
+  let d=load();basicList.innerHTML='';
+  d.basic.forEach((r,i)=>{
+    let w=document.createElement('div');w.className='manual';
+
+    let date=document.createElement('input');
+    date.type='date';date.className='date';date.value=r.date||'';
+    date.oninput=()=>{let x=load();x.basic[i].date=date.value;save(x)};
+
+    let name=document.createElement('input');
+    name.value=r.name||'';name.placeholder='항목';name.style.height='36px';
+    name.style.border='1px solid #d1d5db';name.style.borderRadius='9px';name.style.padding='0 8px';
+    name.oninput=()=>{let x=load();x.basic[i].name=name.value;save(x)};
+
+    let inp=document.createElement('input');
+    inp.className='money';inp.type='number';inp.inputMode='numeric';inp.value=r.amount||'';inp.placeholder='0';
+    inp.oninput=()=>{let x=load();x.basic[i].amount=Number(inp.value||0);save(x);summary()};
+
+    let del=document.createElement('button');
+    del.className='del';del.textContent='×';
+    del.onclick=()=>{let x=load();x.basic.splice(i,1);save(x);renderBasic();summary()};
+
+    let memo=document.createElement('input');
+    memo.className='memo';memo.placeholder='메모';memo.value=r.memo||'';
+    memo.oninput=()=>{let x=load();x.basic[i].memo=memo.value;save(x)};
+
+    w.append(date,name,inp,del,memo);
+    basicList.appendChild(w);
+  })
+}
+addBasic.onclick=()=>{
+  if(!basicName.value.trim())return alert('지출 항목을 입력하세요.');
+  let d=load();
+  d.basic.push({
+    date:basicDate.value||'',
+    name:basicName.value.trim(),
+    amount:Number(basicAmount.value||0),
+    memo:basicMemo.value.trim(),
+    paid:true
+  });
+  save(d);
+  basicDate.value='';basicName.value='';basicAmount.value='';basicMemo.value='';
+  renderBasic();summary();
+};
+function summary(){let d=load(),inc=0,fx=0,bs=0,sv=0,un=0;Object.values(d.income).forEach(v=>inc+=+v||0);fixed.forEach(([c,n])=>{let r=d.fixed[n]||{};fx+=+r.amount||0;if(!r.paid)un++});Object.values(d.saving).forEach(v=>sv+=+v||0);d.basic.forEach(r=>bs+=+r.amount||0);let ex=fx+bs+sv,bal=inc-ex;tIncome.textContent=sIncome.textContent=won(inc);tExpense.textContent=won(ex);tFixed.textContent=sFixed.textContent=won(fx);tBasic.textContent=sBasic.textContent=won(bs);tSaving.textContent=sSaving.textContent=won(sv);tUnpaid.textContent=un+'건';tBalance.textContent=sBalance.textContent=won(bal);tBalance.className=sBalance.className=bal<0?'bad':'good'}
+showPaid.onclick=()=>{paidView=!paidView;showPaid.textContent=paidView?'결제완료 숨기기':'결제완료 보기';render()};month.onchange=render;reset.onclick=()=>{if(confirm(month.value+'월 입력값을 초기화할까요?')){localStorage.removeItem(key());render()}};
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.page).classList.add('active')});
+function renderDebt(){let d=JSON.parse(localStorage.getItem(debtKey)||'{}');debtList.innerHTML='';debts.forEach(n=>{let r=d[n]||{},box=document.createElement('div');box.innerHTML=`<div class="name" style="font-weight:700;margin-top:10px">${n}</div><div class="add" style="grid-template-columns:1fr 1fr"><input type="number" inputmode="numeric" placeholder="현재잔액" value="${r.balance||''}" data-n="${n}" data-f="balance"><input type="number" inputmode="decimal" placeholder="금리 %" value="${r.rate||''}" data-n="${n}" data-f="rate"><input type="number" inputmode="numeric" placeholder="최소상환" value="${r.min||''}" data-n="${n}" data-f="min"><input type="number" inputmode="numeric" placeholder="추가상환" value="${r.extra||''}" data-n="${n}" data-f="extra"></div>`;debtList.appendChild(box)});debtList.querySelectorAll('input').forEach(i=>i.oninput=()=>{let x=JSON.parse(localStorage.getItem(debtKey)||'{}');x[i.dataset.n]=x[i.dataset.n]||{};x[i.dataset.n][i.dataset.f]=Number(i.value||0);localStorage.setItem(debtKey,JSON.stringify(x));debtSummary()});debtSummary()}
+function debtSummary(){let x=JSON.parse(localStorage.getItem(debtKey)||'{}'),a=0,b=0,c=0;debts.forEach(n=>{a+=+x[n]?.balance||0;b+=+x[n]?.min||0;c+=+x[n]?.extra||0});dTotal.textContent=won(a);dMin.textContent=won(b);dExtra.textContent=won(c)}
+render();renderDebt();
+</script></body></html>
