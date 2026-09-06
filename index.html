@@ -68,7 +68,7 @@
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-지출분리</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-대출공과금분리</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -80,7 +80,8 @@
     <div class="cards">
       <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
       <div class="card"><small>총지출</small><b id="sumExpense">0원</b></div>
-      <div class="card"><small>고정지출</small><b id="sumFixed">0원</b></div>
+      <div class="card"><small>대출지출 총금액</small><b id="sumLoans">0원</b></div>
+      <div class="card"><small>공과금</small><b id="sumUtilities">0원</b></div>
       <div class="card"><small>보험지출 총금액</small><b id="sumInsurance">0원</b></div>
       <div class="card"><small>학원비 총지출</small><b id="sumAcademy">0원</b></div>
       <div class="card"><small>기타지출</small><b id="sumMisc">0원</b></div>
@@ -90,7 +91,8 @@
     </div>
     <div class="section"><h2>이번 달 정리</h2>
       <div class="sum"><span>수입</span><b id="rIncome">0원</b></div>
-      <div class="sum"><span>고정지출</span><b id="rFixed">0원</b></div>
+      <div class="sum"><span>대출지출</span><b id="rLoans">0원</b></div>
+      <div class="sum"><span>공과금</span><b id="rUtilities">0원</b></div>
       <div class="sum"><span>보험지출</span><b id="rInsurance">0원</b></div>
       <div class="sum"><span>학원비</span><b id="rAcademy">0원</b></div>
       <div class="sum"><span>기타지출</span><b id="rMisc">0원</b></div>
@@ -355,7 +357,7 @@ localStorage.setItem=function(k,v){
   if(isBudgetKey(k)) queueCloudSave();
 };
 
-localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-지출분리');
+localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-대출공과금분리');
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
 const defaultFixedItems=[
 ['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],
@@ -467,42 +469,68 @@ function readMonthData(y,m){
   try{return migrateShape(JSON.parse(raw))}catch(e){return null}
 }
 function fixedSummaryParts(d){
-  let fixed=0, insurance=0, academy=0;
+  let loans=0, utilities=0, insurance=0, academy=0, otherFixed=0;
+
   getFixedItems().forEach(([cat,n])=>{
     const amount=Number(d.fixed?.[n]?.amount)||0;
     const c=String(cat||'').trim();
     const name=String(n||'').trim();
 
+    const isLoan =
+      c.includes('대출') ||
+      name.includes('대출') ||
+      name.includes('디딤돌') ||
+      name.includes('오케이') ||
+      name.includes('롯데');
+
+    const isUtility =
+      c.includes('공과금') ||
+      ['가스','전기','관리비','재산세'].some(x=>name.includes(x));
+
     const isInsurance = c.includes('보험') || name.includes('보험');
+
     const isAcademy =
       c.includes('교육') || c.includes('학원') ||
       name.includes('웅진씽크빅') || name.includes('웅진씽빅') ||
       name.includes('학원');
 
-    if(isInsurance) insurance += amount;
+    if(isLoan) loans += amount;
+    else if(isUtility) utilities += amount;
+    else if(isInsurance) insurance += amount;
     else if(isAcademy) academy += amount;
-    else fixed += amount;
+    else otherFixed += amount;
   });
-  return {fixed,insurance,academy};
+
+  return {loans,utilities,insurance,academy,otherFixed};
 }
 
 function calcMonthSummary(d){
-  if(!d) return {income:0,fixed:0,insurance:0,academy:0,misc:0,invest:0,saving:0,expense:0,balance:0};
+  if(!d) return {income:0,loans:0,utilities:0,insurance:0,academy:0,otherFixed:0,misc:0,invest:0,saving:0,expense:0,balance:0};
   d=migrateShape(d);
   let income=0,misc=0,invest=0,saving=0;
   Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
+
   const parts=fixedSummaryParts(d);
+
   (d.misc||[]).forEach(r=>misc+=Number(r.amount)||0);
   (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
   Object.values(d.saving||{}).forEach(v=>saving+=Number(v)||0);
 
-  // 총지출에는 고정지출 + 보험 + 학원비가 모두 포함됩니다.
-  const expense=parts.fixed+parts.insurance+parts.academy+misc+invest+saving;
+  const expense=
+    parts.loans+
+    parts.utilities+
+    parts.insurance+
+    parts.academy+
+    parts.otherFixed+
+    misc+invest+saving;
+
   return {
     income,
-    fixed:parts.fixed,
+    loans:parts.loans,
+    utilities:parts.utilities,
     insurance:parts.insurance,
     academy:parts.academy,
+    otherFixed:parts.otherFixed,
     misc,invest,saving,expense,
     balance:income-expense
   };
@@ -515,7 +543,8 @@ function renderComparison(){
   const rows=[
     ['수입','income'],
     ['총지출','expense'],
-    ['고정지출','fixed'],
+    ['대출지출','loans'],
+    ['공과금','utilities'],
     ['보험지출','insurance'],
     ['학원비','academy'],
     ['기타지출','misc'],
@@ -691,13 +720,21 @@ function updateSummary(){
   d.invest.forEach(r=>inv+=Number(r.amount)||0);
   Object.values(d.saving).forEach(v=>sav+=Number(v)||0);
 
-  const exp=parts.fixed+parts.insurance+parts.academy+misc+inv+sav;
+  const exp=
+    parts.loans+
+    parts.utilities+
+    parts.insurance+
+    parts.academy+
+    parts.otherFixed+
+    misc+inv+sav;
+
   const bal=inc-exp;
 
   sumIncome.textContent=rIncome.textContent=won(inc);
   sumExpense.textContent=won(exp);
 
-  sumFixed.textContent=rFixed.textContent=won(parts.fixed);
+  sumLoans.textContent=rLoans.textContent=won(parts.loans);
+  sumUtilities.textContent=rUtilities.textContent=won(parts.utilities);
   sumInsurance.textContent=rInsurance.textContent=won(parts.insurance);
   sumAcademy.textContent=rAcademy.textContent=won(parts.academy);
 
