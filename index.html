@@ -33,7 +33,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo"
       <div class="sum"><span>적금</span><b id="sSaving">0원</b></div>
       <div class="sum"><span>남는 돈</span><b id="sBalance">0원</b></div>
     </div>
-    <div class="tip">월급 입력 → 고정지출 결제체크 → 기타지출 직접 추가 → 적금 입력 → 남는 돈 확인 순서로 쓰면 됩니다.</div>
+    <div class="tip"><b>이전 입력값 복구:</b> 새 버전이 예전 월별 저장값을 자동으로 찾아 현재 연도·월로 옮깁니다.<br><br>월급 입력 → 고정지출 결제체크 → 기타지출 직접 추가 → 적금 입력 → 남는 돈 확인 순서로 쓰면 됩니다.</div>
   </section>
 
   <section id="fixed" class="page">
@@ -71,7 +71,36 @@ const savings=['한화적금'];
 const debts=['디딤돌','신용대출','우리대출','오케이대출1','오케이대출2','롯데대출'];
 const month=document.getElementById('month');for(let i=1;i<=12;i++){let o=document.createElement('option');o.value=i;o.textContent=i+'월';month.appendChild(o)}month.value=new Date().getMonth()+1;
 let paidView=false; const key=()=>`budget_v5_${month.value}`, debtKey='budget_v5_debts';
-const load=()=>JSON.parse(localStorage.getItem(key())||'{"income":{},"fixed":{},"saving":{},"basic":[],"invest":[]}');
+const load=()=>{
+  const currentKey=key();
+  const current=localStorage.getItem(currentKey);
+  if(current) return JSON.parse(current);
+
+  // 이전 버전 저장값 자동 복구
+  const oldKeys=[
+    `budget4_${m.value}`,
+    `budget_v3_${m.value}`,
+    `budget_v2_${m.value}`
+  ];
+
+  for(const k of oldKeys){
+    const old=localStorage.getItem(k);
+    if(old){
+      try{
+        const d=JSON.parse(old);
+        d.income=d.income||{};
+        d.fixed=d.fixed||{};
+        d.saving=d.saving||{};
+        d.basic=d.basic||[];
+        d.invest=d.invest||[];
+        localStorage.setItem(currentKey,JSON.stringify(d));
+        return d;
+      }catch(e){}
+    }
+  }
+
+  return {income:{},fixed:{},saving:{},basic:[],invest:[]};
+};
 const save=x=>localStorage.setItem(key(),JSON.stringify(x));
 const won=x=>(Number(x)||0).toLocaleString('ko-KR')+'원';
 function rowEl(name,sub,val,paid,onInput,onCheck,checkable){let r=document.createElement('div');r.className='row'+(paid&&!paidView&&checkable?' hidden':'');let l=document.createElement('div');l.innerHTML=`<div class="name">${name}</div><div class="sub">${sub}</div>`;let i=document.createElement('input');i.className='money';i.type='number';i.inputMode='numeric';i.value=val||'';i.placeholder='0';i.oninput=()=>onInput(i.value);let c=document.createElement('button');if(checkable){c.className='check '+(paid?'done':'');c.textContent=paid?'✓':'';c.onclick=onCheck}else c.style.visibility='hidden';r.append(l,i,c);return r}
