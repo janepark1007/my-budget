@@ -126,7 +126,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-카드완전삭제</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-최종잔액수정</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -157,8 +157,8 @@
       <div class="compare-row"><div class="compare-label">적금</div><div class="compare-amount" id="cmpSavingPlan">0원</div><div class="compare-amount" id="cmpSavingActual">0원</div></div>
 
       <div class="compare-row compare-total"><div class="compare-label">지출 합계</div><div class="compare-amount" id="cmpPlanTotal">0원</div><div class="compare-amount" id="cmpActualTotal">0원</div></div>
-      <div class="compare-row compare-total"><div class="compare-label">이번달 사용가능한 돈</div><div class="compare-amount">-</div><div class="compare-amount" id="tblAvailable">0원</div></div>
-      <div class="compare-row compare-total"><div class="compare-label">이번 달 남는 돈</div><div class="compare-amount">-</div><div class="compare-amount" id="tblBalance">0원</div></div>
+      <div class="compare-row compare-total"><div class="compare-label">이번달 사용가능한 돈</div><div class="compare-amount" id="tblAvailable">0원</div><div class="compare-amount">-</div></div>
+      <div class="compare-row compare-total"><div class="compare-label">이번 달 남는 돈</div><div class="compare-amount" id="tblBalance">0원</div><div class="compare-amount">-</div></div>
     </div>
 
 
@@ -450,7 +450,7 @@ localStorage.setItem=function(k,v){
   if(isBudgetKey(k)) queueCloudSave();
 };
 
-localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-카드완전삭제');
+localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-최종잔액수정');
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
 const defaultFixedItems=[
 ['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],
@@ -1057,7 +1057,6 @@ function updateSummary(){
   const s=calcMonthSummary(d);
   const actualFixed=fixedActualParts(d);
 
-  // 먼저 예정지출 합계를 계산한 뒤 화면에 표시해야 함.
   const planCompareTotal =
     s.loans+
     s.utilities+
@@ -1075,13 +1074,12 @@ function updateSummary(){
     s.misc+
     s.invest;
 
-  const finalAvailable=INCOME_MONTHLY_PLAN-planCompareTotal;
-  const expenseRate=INCOME_MONTHLY_PLAN>0 ? (planCompareTotal/INCOME_MONTHLY_PLAN*100) : 0;
-  const remainRate=INCOME_MONTHLY_PLAN>0 ? (finalAvailable/INCOME_MONTHLY_PLAN*100) : 0;
+  // 기본 예정 총수입 - 기본 예정 지출합계
+  const finalAvailable = INCOME_MONTHLY_PLAN - planCompareTotal;
 
-  // 통합 메인표
   setTextIf('tblIncomePlan',won(INCOME_MONTHLY_PLAN));
   setTextIf('tblIncome',won(s.income));
+
   setTextIf('tblPlannedExpense',won(planCompareTotal));
   setTextIf('tblActualExpense',won(s.actualExpense));
   setTextIf('tblRemainingExpense',won(s.remainingExpense));
@@ -1110,24 +1108,25 @@ function updateSummary(){
   setTextIf('cmpPlanTotal',won(planCompareTotal));
   setTextIf('cmpActualTotal',won(actualCompareTotal));
 
+  // 최종 계산값 두 줄
   setTextIf('tblAvailable',won(finalAvailable));
   setTextIf('tblBalance',won(finalAvailable));
 
-  // 하단 월간 통계
+  // 하단 통계
+  const expenseRate = INCOME_MONTHLY_PLAN>0 ? (planCompareTotal/INCOME_MONTHLY_PLAN*100) : 0;
+  const remainRate = INCOME_MONTHLY_PLAN>0 ? (finalAvailable/INCOME_MONTHLY_PLAN*100) : 0;
+
   setTextIf('statIncome',won(INCOME_MONTHLY_PLAN));
   setTextIf('statExpense',won(planCompareTotal));
   setTextIf('statRemain',won(finalAvailable));
   setTextIf('statExpenseRate',expenseRate.toFixed(1)+'%');
   setTextIf('statRemainRate',remainRate.toFixed(1)+'%');
 
-  const remain=document.getElementById('tblRemainingExpense');
-  if(remain){
-    remain.className='compare-amount' + (s.remainingExpense>50000 ? ' bad' : '');
-  }
   const avail=document.getElementById('tblAvailable');
-  if(avail){
-    avail.className='compare-amount ' + (finalAvailable<0 ? 'bad' : 'good');
-  }
+  if(avail) avail.className='compare-amount ' + (finalAvailable<0 ? 'bad' : 'good');
+
+  const bal=document.getElementById('tblBalance');
+  if(bal) bal.className='compare-amount ' + (finalAvailable<0 ? 'bad' : 'good');
 }
 function renderDebts(){
   const d=JSON.parse(localStorage.getItem(debtKey)||'{}');debtList.innerHTML='';
