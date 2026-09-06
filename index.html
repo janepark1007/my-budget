@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#203864">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>우리집 빚갚는 가계부</title>
 <style>
 :root{--navy:#203864;--bg:#f5f7fb;--card:#fff;--line:#e5e7eb;--yellow:#fff4cc;--green:#e8f5e9;--muted:#6b7280}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 .app{max-width:760px;margin:auto;padding:12px 12px 94px}.hero{background:var(--navy);color:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 20px #20386422}
-.hero h1{margin:0 0 6px;font-size:22px}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
+.hero h1{margin:0 0 6px;font-size:22px}.versionbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;opacity:.9}.refreshbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#fff;color:#203864}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
 .ym select,.ym button{height:42px;border:0;border-radius:10px;padding:0 10px}.ym button{font-weight:800}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.card,.section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 12px #0000000d}
 .card small{color:var(--muted)}.card b{display:block;font-size:20px;margin-top:4px}.wide{grid-column:1/-1;background:var(--green)}.wide b{font-size:25px}
@@ -27,13 +30,45 @@
 .tabs{max-width:760px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.tab{border:0;border-radius:10px;background:#eef2f7;padding:10px 3px;font-size:12px;font-weight:800}.tab.active{background:var(--navy);color:#fff}
 .debtgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:6px 0 12px}.debtgrid input{height:40px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px}
 @media(max-width:390px){.row{grid-template-columns:1fr 100px 34px}.manual{grid-template-columns:78px 1fr 92px 30px}}
+
+@media(max-width:600px){
+  body{font-size:14px}
+  .app{padding:8px 8px 96px}
+  .hero{border-radius:16px;padding:14px}
+  .hero h1{font-size:20px}
+  .ym{grid-template-columns:1fr 1fr}
+  .ym button{grid-column:1/-1}
+  .cards{grid-template-columns:1fr 1fr;gap:7px}
+  .card{padding:11px}
+  .card b{font-size:18px}
+  .wide b{font-size:22px}
+  .section{padding:11px;border-radius:14px}
+  .section h2{font-size:16px;gap:6px;align-items:flex-start}
+  .row{grid-template-columns:1fr 100px 34px;gap:6px}
+  .bank{grid-template-columns:62px 1fr}
+  .fixed-edit{grid-template-columns:1fr 65px}
+  .manual{grid-template-columns:1fr 94px 30px}
+  .manual .dateinput{grid-column:1/-1}
+  .manual .memo{grid-column:1/-1}
+  .addbox{grid-template-columns:1fr 100px}
+  .addbox input:first-child{grid-column:1/-1}
+  .addbox .memoAdd{grid-column:1/-1}
+  .addbox button{grid-column:1/-1;grid-row:auto;height:40px}
+  .debtgrid{grid-template-columns:1fr}
+  .compare{font-size:12px}
+  .compare th,.compare td{padding:8px 4px}
+  .bottom{padding-left:6px;padding-right:6px}
+  .tabs{gap:4px}
+  .tab{font-size:11px;padding:10px 2px}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p>
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-01</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div>
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
@@ -124,6 +159,7 @@
 
 <script>
 'use strict';
+localStorage.setItem('mybudget_app_version','2026.09.07-01');
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
 const defaultFixedItems=[
 ['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],
@@ -412,6 +448,16 @@ addMisc.onclick=()=>{if(!miscName.value.trim())return alert('지출 항목을 �
 investAmount.addEventListener('input',()=>investAmount.value=formatInput(investAmount.value));
 addInvest.onclick=()=>{if(!investName.value.trim())return alert('투자 항목을 입력하세요.');const d=loadData();d.invest.push({name:investName.value.trim(),amount:onlyNumber(investAmount.value)});saveData(d);investName.value='';investAmount.value='';renderInvest();updateSummary()};
 document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active')});
+
+
+const refreshBtn=document.getElementById('forceRefresh');
+if(refreshBtn){
+  refreshBtn.onclick=()=>{
+    const u=new URL(window.location.href);
+    u.searchParams.set('v',Date.now());
+    window.location.replace(u.toString());
+  };
+}
 
 renderAll();renderDebts();
 </script>
