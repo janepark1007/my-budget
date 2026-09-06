@@ -79,7 +79,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-최종계산식</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-보험메인확정</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -517,11 +517,22 @@ function fixedSummaryParts(d){
   const defaultCats={};
   defaultFixedItems.forEach(([cat,name])=>defaultCats[name]=cat);
 
-  // 실제 월 데이터(d.fixed)를 기준으로 전부 순회한다.
-  // 이렇게 해야 master 목록에 누락되어도 한화보험 등 현재 저장된 보험금액이 메인에 표시된다.
-  Object.entries(d.fixed||{}).forEach(([name,r])=>{
-    const amount=Number(r?.amount)||0;
-    const cat=String(master?.[name]?.category || defaultCats[name] || '').trim();
+  // 월 데이터와 고정마스터의 모든 항목을 합쳐서 검사한다.
+  // 월 금액이 0/비어 있고 마스터에 금액이 있으면 마스터 금액을 사용한다.
+  const names=new Set([
+    ...Object.keys(d.fixed||{}),
+    ...Object.keys(master||{}),
+    ...defaultFixedItems.map(([,name])=>name)
+  ]);
+
+  names.forEach(name=>{
+    const monthRow=(d.fixed||{})[name]||{};
+    const masterRow=(master||{})[name]||{};
+    const monthAmount=Number(monthRow.amount)||0;
+    const masterAmount=Number(masterRow.amount)||0;
+    const amount=monthAmount>0 ? monthAmount : masterAmount;
+
+    const cat=String(masterRow.category || defaultCats[name] || '').trim();
     const nm=String(name||'').trim();
 
     const isInsurance = cat.includes('보험') || nm.includes('보험');
@@ -536,7 +547,6 @@ function fixedSummaryParts(d){
       nm.includes('대출') || nm.includes('디딤돌') ||
       nm.includes('오케이') || nm.includes('롯데');
 
-    // 보험을 가장 먼저 판별해서 다른 분류로 빠지는 것을 방지
     if(isInsurance) insurance += amount;
     else if(isUtility) utilities += amount;
     else if(isAcademy) academy += amount;
@@ -565,8 +575,18 @@ function calcMonthSummary(d){
   (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
   Object.values(d.saving||{}).forEach(v=>saving+=Number(v)||0);
 
-  Object.values(d.fixed||{}).forEach(r=>{
-    const amount=Number(r?.amount)||0;
+  const fixedMasterForCalc=loadFixedMaster();
+  const fixedNamesForCalc=new Set([
+    ...Object.keys(d.fixed||{}),
+    ...Object.keys(fixedMasterForCalc||{}),
+    ...defaultFixedItems.map(([,name])=>name)
+  ]);
+  fixedNamesForCalc.forEach(name=>{
+    const r=(d.fixed||{})[name]||{};
+    const mr=(fixedMasterForCalc||{})[name]||{};
+    const monthAmount=Number(r.amount)||0;
+    const masterAmount=Number(mr.amount)||0;
+    const amount=monthAmount>0 ? monthAmount : masterAmount;
     if(r?.paid) paidFixed+=amount;
     else unpaidFixed+=amount;
   });
@@ -725,7 +745,20 @@ function applyFixedMaster(d){
   getFixedItems().forEach(([cat,n])=>{
     if(!d.fixed[n]) d.fixed[n]={};
     const m=master[n]||{};
-    if((d.fixed[n].amount===undefined || d.fixed[n].amount===null || d.fixed[n].amount==='') && m.amount!==undefined) d.fixed[n].amount=m.amount;
+    const monthAmount=Number(d.fixed[n].amount)||0;
+    const masterAmount=Number(m.amount)||0;
+
+    // 월 데이터가 비어 있거나 0인데 고정마스터에 실제 금액이 있으면
+    // 고정마스터 금액을 사용한다. 보험 등 고정비가 메인에서 0원으로 빠지는 문제 방지.
+    if(
+      d.fixed[n].amount===undefined ||
+      d.fixed[n].amount===null ||
+      d.fixed[n].amount==='' ||
+      (monthAmount===0 && masterAmount>0)
+    ){
+      if(m.amount!==undefined) d.fixed[n].amount=m.amount;
+    }
+
     if(!d.fixed[n].bank && m.bank) d.fixed[n].bank=m.bank;
   });
   return d;
