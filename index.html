@@ -111,7 +111,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-비교표직접반영</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-통합메인표</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -120,12 +120,19 @@
   </div>
 
   <section id="home" class="page active">
+    
     <div class="compare-wrap" id="mainCompare">
       <div class="compare-head">
-        <div>지출 항목</div>
-        <div class="compare-amount">기본 예정지출</div>
-        <div class="compare-amount">이번달 지출</div>
+        <div>항목</div>
+        <div class="compare-amount">기본 예정금액</div>
+        <div class="compare-amount">이번달 금액</div>
       </div>
+
+      <div class="compare-row compare-total"><div class="compare-label">총수입</div><div class="compare-amount">-</div><div class="compare-amount" id="tblIncome">0원</div></div>
+      <div class="compare-row compare-total"><div class="compare-label">이번달 예정지출</div><div class="compare-amount" id="tblPlannedExpense">0원</div><div class="compare-amount">-</div></div>
+      <div class="compare-row"><div class="compare-label">현재까지 실제지출</div><div class="compare-amount">-</div><div class="compare-amount" id="tblActualExpense">0원</div></div>
+      <div class="compare-row"><div class="compare-label">남은 예정지출</div><div class="compare-amount" id="tblRemainingExpense">0원</div><div class="compare-amount">-</div></div>
+
       <div class="compare-row"><div class="compare-label">대출</div><div class="compare-amount" id="cmpLoanPlan">0원</div><div class="compare-amount" id="cmpLoanActual">0원</div></div>
       <div class="compare-row"><div class="compare-label">공과금</div><div class="compare-amount" id="cmpUtilityPlan">0원</div><div class="compare-amount" id="cmpUtilityActual">0원</div></div>
       <div class="compare-row"><div class="compare-label">보험</div><div class="compare-amount" id="cmpInsurancePlan">0원</div><div class="compare-amount" id="cmpInsuranceActual">0원</div></div>
@@ -133,8 +140,12 @@
       <div class="compare-row"><div class="compare-label">생활비·기타</div><div class="compare-amount" id="cmpMiscPlan">0원</div><div class="compare-amount" id="cmpMiscActual">0원</div></div>
       <div class="compare-row"><div class="compare-label">부업 투자</div><div class="compare-amount" id="cmpInvestPlan">0원</div><div class="compare-amount" id="cmpInvestActual">0원</div></div>
       <div class="compare-row"><div class="compare-label">적금</div><div class="compare-amount" id="cmpSavingPlan">0원</div><div class="compare-amount" id="cmpSavingActual">0원</div></div>
-      <div class="compare-row compare-total"><div class="compare-label">합계</div><div class="compare-amount" id="cmpPlanTotal">0원</div><div class="compare-amount" id="cmpActualTotal">0원</div></div>
+
+      <div class="compare-row compare-total"><div class="compare-label">지출 합계</div><div class="compare-amount" id="cmpPlanTotal">0원</div><div class="compare-amount" id="cmpActualTotal">0원</div></div>
+      <div class="compare-row compare-total"><div class="compare-label">이번달 사용가능한 돈</div><div class="compare-amount">-</div><div class="compare-amount" id="tblAvailable">0원</div></div>
+      <div class="compare-row compare-total"><div class="compare-label">이번 달 남는 돈</div><div class="compare-amount">-</div><div class="compare-amount" id="tblBalance">0원</div></div>
     </div>
+
 
     <div class="compare-syncbar" id="compareSyncBar">
       <span class="syncstate" id="compareSyncStatus">동기화하면 메인 통계도 함께 갱신됩니다.</span>
@@ -143,10 +154,8 @@
     </div>
 
 
-<div class="note" style="margin-top:10px"><b>계산기준:</b> 이번달 예정지출은 아래 지출항목 전체 합계입니다. 기타지출을 사용하면 생활비·기타 예정 50만원에서 자동 차감됩니다. <b>이번달 사용가능한 돈 = 총수입 − 이번달 예정지출</b></div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
-    <div class="cards">
-      <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
-      <div class="card"><small>이번달 예정지출</small><b id="sumExpense">0원</b></div>
+<div class="note" style="margin-top:10px"><b>계산기준:</b> 메인 통계는 위 표 하나에서 모두 확인합니다. 기본 예정금액과 이번달 실제금액을 좌우로 비교하며, 이번달 사용가능한 돈 = 총수입 − 이번달 예정지출입니다.</div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
+<div class="card"><small>이번달 예정지출</small><b id="sumExpense">0원</b></div>
       <div class="card"><small>현재까지 실제지출</small><b id="sumActualExpense">0원</b></div>
       <div class="card" id="futureMustCard"><small>남은 예정지출</small><b id="sumFutureMust">0원</b></div>
       <div class="card"><small>대출지출 총금액</small><b id="sumLoans">0원</b></div>
@@ -1028,51 +1037,13 @@ function setClassIf(id,cls){
 function updateSummary(){
   const d=loadData();
   const s=calcMonthSummary(d);
-
-  // 상단 메인 카드
-  setTextIf('sumIncome',won(s.income));
-  setTextIf('sumExpense',won(s.plannedExpense));
-  setTextIf('sumActualExpense',won(s.actualExpense));
-  setTextIf('sumFutureMust',won(s.remainingExpense));
-  setTextIf('sumLoans',won(s.loans));
-  setTextIf('sumUtilities',won(s.utilities));
-  setTextIf('sumInsurance',won(s.insurance));
-  setTextIf('sumAcademy',won(s.academy));
-  setTextIf('sumMisc',won(s.misc));
-  setTextIf('sumMiscPlan',won(s.miscRemaining));
-  setTextIf('sumInvest',won(s.invest));
-  setTextIf('sumSaving',won(s.saving));
-  setTextIf('sumAvailable',won(s.available));
-  setTextIf('sumBalance',won(s.balance));
-
-  // 혹시 예전 요약 DOM이 남아있는 버전에서도 안전하게 반영
-  setTextIf('rIncome',won(s.income));
-  setTextIf('rPlannedExpense',won(s.plannedExpense));
-  setTextIf('rActualExpense',won(s.actualExpense));
-  setTextIf('rFutureMust',won(s.remainingExpense));
-  setTextIf('rLoans',won(s.loans));
-  setTextIf('rUtilities',won(s.utilities));
-  setTextIf('rInsurance',won(s.insurance));
-  setTextIf('rAcademy',won(s.academy));
-  setTextIf('rMisc',won(s.misc));
-  setTextIf('rMiscPlan',won(s.miscRemaining));
-  setTextIf('rInvest',won(s.invest));
-  setTextIf('rSaving',won(s.saving));
-  setTextIf('rAvailable',won(s.available));
-  setTextIf('rBalance',won(s.balance));
-
-  const futureCard=document.getElementById('futureMustCard');
-  if(futureCard) futureCard.classList.toggle('alert-over-50k',s.remainingExpense>50000);
-  const futureRow=document.getElementById('rFutureMustRow');
-  if(futureRow) futureRow.classList.toggle('alert-over-50k',s.remainingExpense>50000);
-
-  setClassIf('sumAvailable',s.available<0?'bad':'good');
-  setClassIf('rAvailable',s.available<0?'bad':'good');
-  setClassIf('sumBalance',s.balance<0?'bad':'good');
-  setClassIf('rBalance',s.balance<0?'bad':'good');
-
-  // 사진에 보이는 좌우 비교표를 직접 갱신
   const actualFixed=fixedActualParts(d);
+
+  // 통합 메인표: 모든 메인 통계를 이 표 하나에 표시
+  setTextIf('tblIncome',won(s.income));
+  setTextIf('tblPlannedExpense',won(s.plannedExpense));
+  setTextIf('tblActualExpense',won(s.actualExpense));
+  setTextIf('tblRemainingExpense',won(s.remainingExpense));
 
   setTextIf('cmpLoanPlan',won(s.loans));
   setTextIf('cmpLoanActual',won(actualFixed.loans));
@@ -1106,8 +1077,17 @@ function updateSummary(){
   setTextIf('cmpPlanTotal',won(planCompareTotal));
   setTextIf('cmpActualTotal',won(actualCompareTotal));
 
-  if(document.getElementById('comparisonTable')){
-    try{renderComparison();}catch(e){}
+  setTextIf('tblAvailable',won(s.available));
+  setTextIf('tblBalance',won(s.balance));
+
+  // 남은 예정지출 5만원 초과 시 적색 강조
+  const remain=document.getElementById('tblRemainingExpense');
+  if(remain){
+    remain.className='compare-amount' + (s.remainingExpense>50000 ? ' bad' : '');
+  }
+  const avail=document.getElementById('tblAvailable');
+  if(avail){
+    avail.className='compare-amount ' + (s.available<0 ? 'bad' : 'good');
   }
 }
 function renderDebts(){
