@@ -97,7 +97,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-민트통일</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-적금추가</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -162,7 +162,16 @@
       <div id="investList"></div>
       <div class="addbox"><input id="investName" placeholder="투자 항목"><input id="investAmount" inputmode="numeric" placeholder="금액"><button id="addInvest">추가</button></div>
     </div>
-    <div class="section saving-green"><h2>적금</h2><div id="savingList"></div></div>
+    <div class="section saving-green">
+      <h2>적금</h2>
+      <div class="sub">한화적금 외에 용하 적금, 태하 적금 등 원하는 적금을 추가할 수 있습니다.</div>
+      <div id="savingList"></div>
+      <div class="addbox" style="margin-top:12px">
+        <input id="newSavingName" placeholder="적금 이름 예: 용하 적금">
+        <input id="newSavingAmount" inputmode="numeric" placeholder="금액">
+        <button id="addSaving">추가</button>
+      </div>
+    </div>
   </section>
 
   <section id="miscPage" class="page">
@@ -712,8 +721,53 @@ function renderAll(){
     };
     edit.append(nameInp,del); row.appendChild(edit); fixedList.appendChild(row);
   });
-  savingList.appendChild(makeMoneyRow('한화적금','적금',d.saving['한화적금'],false,
-    v=>{const x=loadData();x.saving['한화적금']=v;saveData(x);updateSummary()},null,false,'',null));
+  // 적금 항목: 직접 추가/수정/삭제 가능
+  if(!Object.prototype.hasOwnProperty.call(d.saving,'한화적금')){
+    d.saving['한화적금']=0;
+    saveData(d);
+  }
+  Object.keys(d.saving).forEach(n=>{
+    const row=makeMoneyRow(
+      n,'적금',d.saving[n],false,
+      v=>{const x=loadData();x.saving[n]=v;saveData(x);updateSummary()},
+      null,false,'',null
+    );
+
+    const edit=document.createElement('div');edit.className='fixed-edit';
+    const nameInp=document.createElement('input');
+    nameInp.value=n;
+    nameInp.placeholder='적금 이름';
+
+    const del=document.createElement('button');
+    del.textContent='삭제';
+
+    nameInp.onchange=()=>{
+      const newName=nameInp.value.trim();
+      if(!newName || newName===n) return;
+      const x=loadData();
+      if(Object.prototype.hasOwnProperty.call(x.saving,newName)){
+        alert('같은 이름의 적금이 이미 있습니다.');
+        nameInp.value=n;
+        return;
+      }
+      x.saving[newName]=x.saving[n]||0;
+      delete x.saving[n];
+      saveData(x);
+      renderAll();
+    };
+
+    del.onclick=()=>{
+      if(!confirm(`${n} 적금을 삭제할까요?`)) return;
+      const x=loadData();
+      delete x.saving[n];
+      saveData(x);
+      renderAll();
+    };
+
+    edit.append(nameInp,del);
+    row.appendChild(edit);
+    savingList.appendChild(row);
+  });
   renderMisc();renderInvest();updateSummary();
 }
 function renderMisc(){
@@ -834,6 +888,26 @@ miscAmount.addEventListener('input',()=>miscAmount.value=formatInput(miscAmount.
 addMisc.onclick=()=>{if(!miscName.value.trim())return alert('지출 항목을 입력하세요.');const d=loadData();d.misc.push({date:miscDate.value||'',name:miscName.value.trim(),amount:onlyNumber(miscAmount.value),memo:miscMemo.value.trim()});saveData(d);miscDate.value='';miscName.value='';miscAmount.value='';miscMemo.value='';renderMisc();updateSummary()};
 investAmount.addEventListener('input',()=>investAmount.value=formatInput(investAmount.value));
 addInvest.onclick=()=>{if(!investName.value.trim())return alert('투자 항목을 입력하세요.');const d=loadData();d.invest.push({name:investName.value.trim(),amount:onlyNumber(investAmount.value)});saveData(d);investName.value='';investAmount.value='';renderInvest();updateSummary()};
+
+addSaving.onclick=()=>{
+  const name=newSavingName.value.trim();
+  const amount=onlyNumber(newSavingAmount.value);
+  if(!name){
+    alert('적금 이름을 입력해주세요.');
+    return;
+  }
+  const x=loadData();
+  if(Object.prototype.hasOwnProperty.call(x.saving,name)){
+    alert('같은 이름의 적금이 이미 있습니다.');
+    return;
+  }
+  x.saving[name]=amount;
+  saveData(x);
+  newSavingName.value='';
+  newSavingAmount.value='';
+  renderAll();
+};
+bindMoney(newSavingAmount,0,()=>{});
 document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active')});
 
 
