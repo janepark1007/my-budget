@@ -12,7 +12,7 @@
 :root{--navy:#203864;--bg:#f5f7fb;--card:#fff;--line:#e5e7eb;--yellow:#fff4cc;--green:#e8f5e9;--muted:#6b7280}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 .app{max-width:760px;margin:auto;padding:12px 12px 94px}.hero{background:var(--navy);color:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 20px #20386422}
-.hero h1{margin:0 0 6px;font-size:22px}.versionbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;opacity:.9}.refreshbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#fff;color:#203864}.syncbar{display:flex;gap:7px;align-items:center;margin-top:8px}.syncstatus{font-size:11px;opacity:.95;flex:1}.syncbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#e8f5e9;color:#166534}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
+.hero h1{margin:0 0 6px;font-size:22px}.versionbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;opacity:.9}.refreshbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#fff;color:#203864}.syncbar{display:flex;gap:7px;align-items:center;margin-top:8px;flex-wrap:wrap}.syncstatus{font-size:11px;opacity:.95;flex:1}.syncbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#e8f5e9;color:#166534}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
 .ym select,.ym button{height:42px;border:0;border-radius:10px;padding:0 10px}.ym button{font-weight:800}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.card,.section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 12px #0000000d}
 .card small{color:var(--muted)}.card b{display:block;font-size:20px;margin-top:4px}.wide{grid-column:1/-1;background:var(--green)}.wide b{font-size:25px}
@@ -68,11 +68,15 @@
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-04</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-05</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+      <span id="syncStatus" class="syncstatus">처음 1회 PC 기준데이터 설정 필요</span>
+      <button id="uploadThisDevice" class="syncbtn">이 기기 내용을 기준으로 올리기</button>
+      <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
+    </div>
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
-  <section id="home" class="page active">
+  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>PC·모바일 첫 동기화:</b> 기존 금액이 들어있는 PC에서 먼저 <b>“이 기기 내용을 기준으로 올리기”</b>를 한 번 누른 뒤, 모바일에서는 <b>“클라우드 불러오기”</b>를 누르세요. 이후부터 자동동기화됩니다.</div>
     <div class="cards">
       <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
       <div class="card"><small>총지출</small><b id="sumExpense">0원</b></div>
@@ -172,6 +176,7 @@ function previewNotice(){
 
 const CLOUD_API = 'https://script.google.com/macros/s/AKfycbzpmdsp_YFka2tFmxE_NsbHkwk5av68D5u91vO6zwW6D4THn2g2Gmep9q5iXosU8f1U/exec';
 let cloudReady = false;
+let cloudInitialized = false;
 let cloudSaving = false;
 let cloudSaveTimer = null;
 let cloudLastLoadedAt = 0;
@@ -235,6 +240,7 @@ async function loadFromCloud(force=false) {
           }
         }
         cloudReady=true;
+        cloudInitialized=true;
         cloudLastLoadedAt=Date.now();
         setSyncStatus('✓ PC·모바일 동기화 완료');
         try{renderAll();renderDebts()}catch(e){}
@@ -282,7 +288,8 @@ async function saveToCloud() {
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify(payload)
     });
-    setSyncStatus('✓ 자동 저장됨');
+    cloudInitialized=true;
+    setSyncStatus('✓ 클라우드에 기준 데이터 저장됨');
   } catch(err) {
     setSyncStatus('저장 실패 - 다시 동기화', false);
     console.error('cloud save failed', err);
@@ -292,6 +299,7 @@ async function saveToCloud() {
 }
 
 function queueCloudSave() {
+  if(!cloudInitialized) return;
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(saveToCloud, 700);
 }
@@ -603,25 +611,43 @@ if(refreshBtn){
 }
 
 
+const uploadThisDeviceBtn=document.getElementById('uploadThisDevice');
+if(uploadThisDeviceBtn){
+  uploadThisDeviceBtn.onclick=async()=>{
+    if(!IS_LIVE_GITHUB){
+      previewNotice();
+      alert('실제 GitHub 가계부 주소에서 실행하세요.');
+      return;
+    }
+    if(!confirm('현재 이 기기에 보이는 가계부 내용을 클라우드 기준 데이터로 올릴까요?
+
+처음에는 기존 내용이 들어있는 PC에서 실행하세요.')) return;
+    cloudInitialized=true;
+    await saveToCloud();
+    setSyncStatus('✓ 이 기기 내용이 기준 데이터가 되었습니다');
+  };
+}
+
 const syncNowBtn=document.getElementById('syncNow');
 if(syncNowBtn){
   syncNowBtn.onclick=async()=>{
     if(!IS_LIVE_GITHUB){
       previewNotice();
-      alert('여기 미리보기에서는 동기화하지 않습니다. GitHub 가계부 웹주소에서 사용하세요.');
+      alert('실제 GitHub 가계부 주소에서 실행하세요.');
       return;
     }
     await loadFromCloud(true);
-    await saveToCloud();
   };
 }
-window.addEventListener('focus',()=>{if(IS_LIVE_GITHUB)loadFromCloud(true)});
-document.addEventListener('visibilitychange',()=>{if(IS_LIVE_GITHUB && document.visibilityState==='visible')loadFromCloud(true)});
-window.addEventListener('online',()=>{if(IS_LIVE_GITHUB)loadFromCloud(true)});
+window.addEventListener('focus',()=>{if(IS_LIVE_GITHUB && cloudInitialized)loadFromCloud(true)});
+document.addEventListener('visibilitychange',()=>{if(IS_LIVE_GITHUB && cloudInitialized && document.visibilityState==='visible')loadFromCloud(true)});
+window.addEventListener('online',()=>{if(IS_LIVE_GITHUB && cloudInitialized)loadFromCloud(true)});
 
 renderAll();renderDebts();
 previewNotice();
-if(IS_LIVE_GITHUB)setTimeout(()=>loadFromCloud(true),300);
+if(IS_LIVE_GITHUB){
+  setSyncStatus('처음 1회: 기존 내용이 있는 PC에서 "이 기기 내용을 기준으로 올리기"');
+}
 </script>
 </body>
 </html>
