@@ -69,13 +69,17 @@
 .dueday input{height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px;background:#fff}
 .manual .dueday{grid-column:1/-1}
 
+
+.alert-over-50k{background:#fee2e2!important;border:2px solid #ef4444!important}
+.alert-over-50k small,.alert-over-50k b{color:#b91c1c!important}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-고정일</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-가용금액</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -94,6 +98,8 @@
       <div class="card"><small>기타지출</small><b id="sumMisc">0원</b></div>
       <div class="card"><small>부업 투자지출</small><b id="sumInvest">0원</b></div>
       <div class="card"><small>적금</small><b id="sumSaving">0원</b></div>
+      <div class="card" id="futureMustCard"><small>앞으로 꼭 나갈 금액</small><b id="sumFutureMust">0원</b></div>
+      <div class="card"><small>사용가능한 금액</small><b id="sumAvailable">0원</b></div>
       <div class="card wide"><small>이번 달 남는 돈</small><b id="sumBalance">0원</b></div>
     </div>
     <div class="section"><h2>이번 달 정리</h2>
@@ -105,6 +111,8 @@
       <div class="sum"><span>기타지출</span><b id="rMisc">0원</b></div>
       <div class="sum"><span>부업 투자지출</span><b id="rInvest">0원</b></div>
       <div class="sum"><span>적금</span><b id="rSaving">0원</b></div>
+      <div class="sum" id="rFutureMustRow"><span>앞으로 꼭 나갈 금액</span><b id="rFutureMust">0원</b></div>
+      <div class="sum"><span>사용가능한 금액</span><b id="rAvailable">0원</b></div>
       <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
     </div>
     
@@ -819,6 +827,34 @@ function renderInvest(){
     investList.appendChild(row);
   });
 }
+
+function calcFutureMustAndAvailable(d){
+  let futureMust=0;
+  let paidFixed=0;
+
+  // 아직 결제 체크가 안 된 고정지출만 '앞으로 꼭 나갈 금액'
+  Object.entries(d.fixed||{}).forEach(([name,r])=>{
+    const amount=Number(r?.amount)||0;
+    if(r?.paid) paidFixed+=amount;
+    else futureMust+=amount;
+  });
+
+  // 적금은 계획된 필수금액으로 포함
+  Object.values(d.saving||{}).forEach(v=>{
+    futureMust+=Number(v)||0;
+  });
+
+  let income=0,misc=0,invest=0;
+  Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
+  (d.misc||[]).forEach(r=>misc+=Number(r.amount)||0);
+  (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
+
+  // 지금까지 이미 나간 금액 + 앞으로 필수로 나갈 금액을 뺀 실제 사용가능 금액
+  const available=income-paidFixed-misc-invest-futureMust;
+
+  return {futureMust,available};
+}
+
 function updateSummary(){
   const d=loadData();
   let inc=0,misc=0,inv=0,sav=0;
@@ -853,6 +889,15 @@ function updateSummary(){
   sumSaving.textContent=rSaving.textContent=won(sav);
   sumBalance.textContent=rBalance.textContent=won(bal);
 
+  const fa=calcFutureMustAndAvailable(d);
+  sumFutureMust.textContent=rFutureMust.textContent=won(fa.futureMust);
+  sumAvailable.textContent=rAvailable.textContent=won(fa.available);
+
+  const futureAlert=fa.futureMust>50000;
+  futureMustCard.classList.toggle('alert-over-50k',futureAlert);
+  rFutureMustRow.classList.toggle('alert-over-50k',futureAlert);
+
+  sumAvailable.className=rAvailable.className=fa.available<0?'bad':'good';
   sumBalance.className=rBalance.className=bal<0?'bad':'good';
   renderComparison();
 }
