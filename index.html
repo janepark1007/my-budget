@@ -63,13 +63,19 @@
 }
 
 
+
+.dueday{grid-column:1/-1;display:grid;grid-template-columns:70px 1fr;gap:7px;align-items:center;margin-top:2px}
+.dueday label{font-size:12px;color:var(--muted)}
+.dueday input{height:36px;border:1px solid #d1d5db;border-radius:9px;padding:0 8px;background:#fff}
+.manual .dueday{grid-column:1/-1}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-깔끔기본</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-고정일</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -116,10 +122,10 @@
   </section>
 
   <section id="fixedPage" class="page">
-    <div class="section"><h2>수입</h2><div id="incomeList"></div></div>
+    <div class="section"><h2>수입</h2><div class="sub">각 수입의 입금 고정일을 입력할 수 있습니다.</div><div id="incomeList"></div></div>
     <div class="section">
       <h2>고정지출 <span><button id="saveFixed" class="smallbtn">고정지출 저장</button> <button id="togglePaid" class="smallbtn">결제완료 보기</button></span></h2>
-      <div id="fixedSaveStatus" class="sub" style="margin-bottom:8px">입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.</div>
+      <div id="fixedSaveStatus" class="sub" style="margin-bottom:8px">금액·은행·고정일을 입력할 수 있습니다. 고정일은 월이 바뀌어도 유지됩니다.</div>
       <div id="fixedList"></div>
       <div class="addbox" style="margin-top:12px">
         <input id="newFixedCategory" placeholder="구분 예: 통신비">
@@ -392,6 +398,7 @@ let showPaid=false;
 const storageKey=()=>`mybudget_month_${yearEl.value}_${monthEl.value}`;
 const debtKey='mybudget_debts';
 const fixedMasterKey='mybudget_fixed_master';
+const scheduleMasterKey='mybudget_schedule_master';
 function candidateMonthKeys(){
   const y=yearEl.value, m=monthEl.value;
   return [
@@ -621,6 +628,33 @@ function loadFixedMaster(){
 function saveFixedMaster(fixed){
   localStorage.setItem(fixedMasterKey,JSON.stringify(fixed||{}));
 }
+
+function loadScheduleMaster(){
+  try{return JSON.parse(localStorage.getItem(scheduleMasterKey)||'{}')}catch(e){return {}}
+}
+function getFixedDay(type,name){
+  const s=loadScheduleMaster();
+  return s[`${type}:${name}`]||'';
+}
+function setFixedDay(type,name,value){
+  const s=loadScheduleMaster();
+  const key=`${type}:${name}`;
+  const v=String(value||'').trim();
+  if(v) s[key]=v;
+  else delete s[key];
+  localStorage.setItem(scheduleMasterKey,JSON.stringify(s));
+}
+function addDueDay(row,type,name){
+  const wrap=document.createElement('div');wrap.className='dueday';
+  const lab=document.createElement('label');lab.textContent='고정일';
+  const inp=document.createElement('input');
+  inp.placeholder='예: 10일 / 25일 / 말일';
+  inp.value=getFixedDay(type,name);
+  inp.oninput=()=>setFixedDay(type,name,inp.value);
+  wrap.append(lab,inp);
+  row.appendChild(wrap);
+  return inp;
+}
 function applyFixedMaster(d){
   const master=loadFixedMaster();
   d.fixed=d.fixed||{};
@@ -663,8 +697,12 @@ function makeMoneyRow(name,sub,value,paid,onAmount,onPaid,showBank,bankValue,onB
 function renderAll(){
   const d=loadData();
   incomeList.innerHTML='';fixedList.innerHTML='';savingList.innerHTML='';
-  incomes.forEach(n=>incomeList.appendChild(makeMoneyRow(n,'수입',d.income[n],false,
-    v=>{const x=loadData();x.income[n]=v;saveData(x);updateSummary()},null,false,'',null)));
+  incomes.forEach(n=>{
+    const row=makeMoneyRow(n,'수입',d.income[n],false,
+      v=>{const x=loadData();x.income[n]=v;saveData(x);updateSummary()},null,false,'',null);
+    addDueDay(row,'income',n);
+    incomeList.appendChild(row);
+  });
   getFixedItems().forEach(([cat,n])=>{
     const r=d.fixed[n]||{};
     const master=loadFixedMaster();
@@ -674,6 +712,7 @@ function renderAll(){
       true,r.bank,
       v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),bank:v};saveData(x);const mm=loadFixedMaster();mm[n]={...(mm[n]||{}),bank:v,amount:x.fixed[n].amount??mm[n]?.amount??0,category:mm[n]?.category||cat};saveFixedMaster(mm)}
     );
+    addDueDay(row,'fixed',n);
     const edit=document.createElement('div');edit.className='fixed-edit';
     const nameInp=document.createElement('input');nameInp.value=n;nameInp.placeholder='항목명';
     const del=document.createElement('button');del.textContent='삭제';
@@ -683,12 +722,15 @@ function renderAll(){
       const x=loadData(); const mm=loadFixedMaster();
       x.fixed[newName]={...(x.fixed[n]||{})}; delete x.fixed[n];
       mm[newName]={...(mm[n]||{}),category:mm[n]?.category||cat}; delete mm[n];
+      const oldDay=getFixedDay('fixed',n);
+      if(oldDay){setFixedDay('fixed',newName,oldDay);setFixedDay('fixed',n,'');}
       saveData(x); saveFixedMaster(mm); renderAll();
     };
     del.onclick=()=>{
       if(!confirm(`${n} 항목을 삭제할까요?`)) return;
       const x=loadData(); const mm=loadFixedMaster();
       delete x.fixed[n]; delete mm[n];
+      setFixedDay('fixed',n,'');
       saveData(x); saveFixedMaster(mm); renderAll();
     };
     edit.append(nameInp,del); row.appendChild(edit); fixedList.appendChild(row);
@@ -724,6 +766,8 @@ function renderAll(){
       }
       x.saving[newName]=x.saving[n]||0;
       delete x.saving[n];
+      const oldDay=getFixedDay('saving',n);
+      if(oldDay){setFixedDay('saving',newName,oldDay);setFixedDay('saving',n,'');}
       saveData(x);
       renderAll();
     };
@@ -732,10 +776,12 @@ function renderAll(){
       if(!confirm(`${n} 적금을 삭제할까요?`)) return;
       const x=loadData();
       delete x.saving[n];
+      setFixedDay('saving',n,'');
       saveData(x);
       renderAll();
     };
 
+    addDueDay(row,'saving',n);
     edit.append(nameInp,del);
     row.appendChild(edit);
     savingList.appendChild(row);
@@ -751,7 +797,14 @@ function renderMisc(){
     const amount=document.createElement('input');amount.className='money';bindMoney(amount,r.amount,v=>{const x=loadData();x.misc[i].amount=v;saveData(x);updateSummary()});
     const del=document.createElement('button');del.className='del';del.textContent='×';del.onclick=()=>{const x=loadData();x.misc.splice(i,1);saveData(x);renderMisc();updateSummary()};
     const memo=document.createElement('input');memo.className='textinput memo';memo.placeholder='메모';memo.value=r.memo||'';memo.oninput=()=>{const x=loadData();x.misc[i].memo=memo.value;saveData(x)};
-    row.append(date,name,amount,del,memo);miscList.appendChild(row);
+    row.append(date,name,amount,del,memo);
+    const dueWrap=document.createElement('div');dueWrap.className='dueday';
+    const dueLab=document.createElement('label');dueLab.textContent='고정일';
+    const due=document.createElement('input');due.placeholder='예: 10일 / 말일';
+    due.value=getFixedDay('misc',r.name||`항목${i+1}`);
+    due.oninput=()=>setFixedDay('misc',name.value.trim()||`항목${i+1}`,due.value);
+    dueWrap.append(dueLab,due);row.appendChild(dueWrap);
+    miscList.appendChild(row);
   });
 }
 function renderInvest(){
@@ -761,7 +814,9 @@ function renderInvest(){
     const label=document.createElement('div');label.innerHTML=`<div>${r.name}</div><div class="sub">부업 투자지출</div>`;
     const amount=document.createElement('input');amount.className='money';bindMoney(amount,r.amount,v=>{const x=loadData();x.invest[i].amount=v;saveData(x);updateSummary()});
     const del=document.createElement('button');del.className='del';del.textContent='×';del.onclick=()=>{const x=loadData();x.invest.splice(i,1);saveData(x);renderInvest();updateSummary()};
-    row.append(label,amount,del);investList.appendChild(row);
+    row.append(label,amount,del);
+    addDueDay(row,'invest',r.name);
+    investList.appendChild(row);
   });
 }
 function updateSummary(){
@@ -834,7 +889,7 @@ saveFixed.onclick=()=>{
   });
   saveFixedMaster(master);
   fixedSaveStatus.textContent='✅ 고정지출이 영구저장되었습니다. 다음 달과 웹 업데이트 후에도 불러옵니다.';
-  setTimeout(()=>{fixedSaveStatus.textContent='입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.'},3500);
+  setTimeout(()=>{fixedSaveStatus.textContent='금액·은행·고정일을 입력할 수 있습니다. 고정일은 월이 바뀌어도 유지됩니다.'},3500);
 };
 
 
