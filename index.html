@@ -79,7 +79,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-예정실제분리</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-최종계산식</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -87,7 +87,7 @@
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
-  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>계산기준:</b> 예정지출 = 이번 달 전체 계획금액 · 실제지출 = 결제완료된 고정지출 + 실제 기타/부업지출 · 남은 예정지출 = 아직 결제 안 된 고정지출 + 남은 생활비 50만원 + 적금입니다.</div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
+  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>계산기준:</b> 이번달 예정지출은 아래 지출항목 전체 합계입니다. 기타지출을 사용하면 생활비·기타 예정 50만원에서 자동 차감됩니다. <b>이번달 사용가능한 돈 = 총수입 − 이번달 예정지출</b></div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
     <div class="cards">
       <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
       <div class="card"><small>이번달 예정지출</small><b id="sumExpense">0원</b></div>
@@ -98,7 +98,7 @@
       <div class="card"><small>보험지출 총금액</small><b id="sumInsurance">0원</b></div>
       <div class="card"><small>학원비 총지출</small><b id="sumAcademy">0원</b></div>
       <div class="card"><small>기타지출</small><b id="sumMisc">0원</b></div>
-      <div class="card"><small>생활비·기타 예정금액</small><b id="sumMiscPlan">500,000원</b></div>
+      <div class="card"><small>남은 생활비·기타 예정금액</small><b id="sumMiscPlan">500,000원</b></div>
       <div class="card"><small>부업 투자지출</small><b id="sumInvest">0원</b></div>
       <div class="card"><small>적금</small><b id="sumSaving">0원</b></div>
       <div class="card"><small>이번달 사용가능한 돈</small><b id="sumAvailable">0원</b></div>
@@ -113,12 +113,12 @@
       <div class="sum"><span>보험지출</span><b id="rInsurance">0원</b></div>
       <div class="sum"><span>학원비</span><b id="rAcademy">0원</b></div>
       <div class="sum"><span>기타지출</span><b id="rMisc">0원</b></div>
-      <div class="sum"><span>생활비·기타 예정금액</span><b id="rMiscPlan">500,000원</b></div>
+      <div class="sum"><span>남은 생활비·기타 예정금액</span><b id="rMiscPlan">500,000원</b></div>
       <div class="sum"><span>부업 투자지출</span><b id="rInvest">0원</b></div>
       <div class="sum"><span>적금</span><b id="rSaving">0원</b></div>
       <div class="sum" id="rFutureMustRow"><span>남은 예정지출</span><b id="rFutureMust">0원</b></div>
       <div class="sum"><span>이번달 사용가능한 돈</span><b id="rAvailable">0원</b></div>
-      <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
+      <div class="sum"><span>이번달 최종 잔액</span><b id="rBalance">0원</b></div>
     </div>
     
     <div class="section">
@@ -550,9 +550,11 @@ function fixedSummaryParts(d){
 function calcMonthSummary(d){
   if(!d) return {
     income:0,loans:0,utilities:0,insurance:0,academy:0,otherFixed:0,
-    misc:0,invest:0,saving:0,plannedExpense:0,actualExpense:0,
-    remainingExpense:0,balance:0,available:0
+    misc:0,miscRemaining:500000,invest:0,saving:0,
+    plannedExpense:0,actualExpense:0,remainingExpense:0,
+    balance:0,available:0
   };
+
   d=migrateShape(d);
 
   let income=0,misc=0,invest=0,saving=0;
@@ -570,23 +572,35 @@ function calcMonthSummary(d){
   });
 
   const parts=fixedSummaryParts(d);
-  const fixedTotal=parts.loans+parts.utilities+parts.insurance+parts.academy+parts.otherFixed;
+  const fixedTotal=
+    parts.loans+
+    parts.utilities+
+    parts.insurance+
+    parts.academy+
+    parts.otherFixed;
 
-  // 생활비·기타는 월 50만원 예산. 실제 사용액이 50만원을 넘으면 실제 사용액을 기준으로 계획액도 늘림.
-  const miscPlanned=Math.max(MISC_MONTHLY_PLAN,misc);
+  // 생활비·기타 월 기준 50만원.
+  // 실제 기타지출을 쓰면 그만큼 예정액이 줄어들어 절대 중복되지 않는다.
   const miscRemaining=Math.max(MISC_MONTHLY_PLAN-misc,0);
 
-  // 이번 달 전체 계획
-  const plannedExpense=fixedTotal + miscPlanned + invest + saving;
+  // 메인 아래 지출 상세를 전부 더한 값과 정확히 동일한 이번달 예정지출.
+  const plannedExpense=
+    fixedTotal+
+    misc+
+    miscRemaining+
+    invest+
+    saving;
 
-  // 실제로 지금까지 나간 돈
-  const actualExpense=paidFixed + misc + invest;
+  // 현재까지 실제로 결제/사용된 금액.
+  const actualExpense=paidFixed+misc+invest;
 
-  // 앞으로 남아 있는 계획금액
-  const remainingExpense=unpaidFixed + miscRemaining + saving;
+  // 아직 앞으로 나갈 예정 금액.
+  const remainingExpense=unpaidFixed+miscRemaining+saving;
 
-  const balance=income-plannedExpense;
-  const available=income-actualExpense-remainingExpense;
+  // 가장 중요한 최종식:
+  // 이번달 사용가능한 돈 = 총수입 - 이번달 예정지출
+  const available=income-plannedExpense;
+  const balance=available;
 
   return {
     income,
@@ -595,11 +609,11 @@ function calcMonthSummary(d){
     insurance:parts.insurance,
     academy:parts.academy,
     otherFixed:parts.otherFixed,
-    misc,invest,saving,
+    misc,miscRemaining,invest,saving,
     plannedExpense,actualExpense,remainingExpense,
     expense:plannedExpense,
     balance,available,
-    paidFixed,unpaidFixed,miscRemaining
+    paidFixed,unpaidFixed
   };
 }
 function renderComparison(){
@@ -617,7 +631,7 @@ function renderComparison(){
     ['기타지출','misc'],
     ['부업 투자지출','invest'],
     ['적금','saving'],
-    ['남는 돈','balance']
+    ['이번달 사용가능한 돈','balance']
   ];
   compareBody.innerHTML='';
   rows.forEach(([label,key])=>{
@@ -898,8 +912,8 @@ function updateSummary(){
   sumAcademy.textContent=rAcademy.textContent=won(s.academy);
 
   sumMisc.textContent=rMisc.textContent=won(s.misc);
-  if(typeof sumMiscPlan!=='undefined') sumMiscPlan.textContent=won(MISC_MONTHLY_PLAN);
-  if(typeof rMiscPlan!=='undefined') rMiscPlan.textContent=won(MISC_MONTHLY_PLAN);
+  if(typeof sumMiscPlan!=='undefined') sumMiscPlan.textContent=won(s.miscRemaining);
+  if(typeof rMiscPlan!=='undefined') rMiscPlan.textContent=won(s.miscRemaining);
 
   sumInvest.textContent=rInvest.textContent=won(s.invest);
   sumSaving.textContent=rSaving.textContent=won(s.saving);
