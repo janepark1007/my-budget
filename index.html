@@ -68,7 +68,7 @@
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-03</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-04</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
@@ -202,28 +202,61 @@ function setSyncStatus(msg, ok=true) {
 
 async function loadFromCloud(force=false) {
   if(!IS_LIVE_GITHUB){previewNotice();return;}
-  try {
-    if (!force && Date.now() - cloudLastLoadedAt < 3000) return;
-    setSyncStatus('클라우드 불러오는 중…');
-    const res = await fetch(CLOUD_API + '?action=load&_=' + Date.now(), {cache:'no-store'});
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const rows = Array.isArray(data.summary) ? data.summary : [];
-    if (rows.length > 1) {
-      for (let i=1;i<rows.length;i++) {
-        const k = rows[i]?.[0], v = rows[i]?.[1];
-        if (k && typeof v === 'string' && v !== '') localStorage.setItem(k, v);
+  if (!force && Date.now() - cloudLastLoadedAt < 3000) return;
+
+  setSyncStatus('클라우드 불러오는 중…');
+
+  return new Promise((resolve)=>{
+    const cb='budgetCloudCb_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    const script=document.createElement('script');
+    let finished=false;
+
+    const cleanup=()=>{
+      if(finished) return;
+      finished=true;
+      try{delete window[cb]}catch(e){window[cb]=undefined}
+      if(script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    const timer=setTimeout(()=>{
+      cleanup();
+      setSyncStatus('동기화 불러오기 실패', false);
+      resolve(false);
+    },12000);
+
+    window[cb]=(data)=>{
+      clearTimeout(timer);
+      try{
+        const rows=Array.isArray(data?.summary)?data.summary:[];
+        if(rows.length>1){
+          for(let i=1;i<rows.length;i++){
+            const k=rows[i]?.[0], v=rows[i]?.[1];
+            if(k && typeof v==='string' && v!=='') _originalSetItem(k,v);
+          }
+        }
+        cloudReady=true;
+        cloudLastLoadedAt=Date.now();
+        setSyncStatus('✓ PC·모바일 동기화 완료');
+        try{renderAll();renderDebts()}catch(e){}
+        cleanup();
+        resolve(true);
+      }catch(err){
+        cleanup();
+        setSyncStatus('동기화 데이터 오류', false);
+        resolve(false);
       }
-    }
-    cloudReady = true;
-    cloudLastLoadedAt = Date.now();
-    setSyncStatus('✓ PC·모바일 동기화 완료');
-    try { renderAll(); renderDebts(); } catch(e) {}
-  } catch(err) {
-    cloudReady = false;
-    setSyncStatus('동기화 연결 확인 필요', false);
-    console.error('cloud load failed', err);
-  }
+    };
+
+    script.onerror=()=>{
+      clearTimeout(timer);
+      cleanup();
+      setSyncStatus('동기화 연결 실패', false);
+      resolve(false);
+    };
+
+    script.src=CLOUD_API+'?action=load&callback='+encodeURIComponent(cb)+'&_='+Date.now();
+    document.head.appendChild(script);
+  });
 }
 
 async function saveToCloud() {
