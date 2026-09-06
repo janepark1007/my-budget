@@ -79,7 +79,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-가용금액수정</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-총지출정리</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -87,7 +87,7 @@
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
-  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
+  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>계산기준:</b> 총지출은 현재 잡힌 지출만 합산하고, 생활비·기타 예정 50만원은 앞으로 나갈 금액에서만 반영합니다.</div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
     <div class="cards">
       <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
       <div class="card"><small>총지출</small><b id="sumExpense">0원</b></div>
@@ -535,6 +535,7 @@ function fixedSummaryParts(d){
 function calcMonthSummary(d){
   if(!d) return {income:0,loans:0,utilities:0,insurance:0,academy:0,otherFixed:0,misc:0,invest:0,saving:0,expense:0,balance:0};
   d=migrateShape(d);
+
   let income=0,misc=0,invest=0,saving=0;
   Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
 
@@ -544,6 +545,8 @@ function calcMonthSummary(d){
   (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
   Object.values(d.saving||{}).forEach(v=>saving+=Number(v)||0);
 
+  // 총지출 = 이번 달에 잡혀 있는 지출 합계.
+  // 생활비·기타 예정 50만원은 '예정금액'이므로 총지출에는 넣지 않음.
   const expense=
     parts.loans+
     parts.utilities+
@@ -832,70 +835,65 @@ function renderInvest(){
 }
 
 function calcFutureMustAndAvailable(d){
-  let futureMust=0;
+  let unpaidFixed=0;
+  let paidFixed=0;
+  let miscActual=0;
+  let investActual=0;
 
-  // 아직 결제 체크가 안 된 고정지출
   Object.entries(d.fixed||{}).forEach(([name,r])=>{
     const amount=Number(r?.amount)||0;
-    if(!r?.paid) futureMust+=amount;
+    if(r?.paid) paidFixed+=amount;
+    else unpaidFixed+=amount;
   });
 
-  // 적금 예정액
-  Object.values(d.saving||{}).forEach(v=>{
-    futureMust+=Number(v)||0;
-  });
+  (d.misc||[]).forEach(r=>miscActual+=Number(r.amount)||0);
+  (d.invest||[]).forEach(r=>investActual+=Number(r.amount)||0);
 
-  // 생활비 + 기타지출 월 예정금액 50만원
-  let misc=0;
-  (d.misc||[]).forEach(r=>misc+=Number(r.amount)||0);
-  const miscPlanRemaining=Math.max(MISC_MONTHLY_PLAN-misc,0);
-  futureMust+=miscPlanRemaining;
+  // 생활비·기타 예정 50만원 중 이미 실제로 쓴 기타지출을 뺀 남은 예정액
+  const miscPlanRemaining=Math.max(MISC_MONTHLY_PLAN-miscActual,0);
 
-  // 현재 화면의 '남는 돈' 계산
-  const summary=calcMonthSummary(d);
+  // 적금은 월 지출 합계에는 포함하지만, 아직 따로 '납입완료' 체크가 없으므로
+  // 사용가능 금액 계산에서는 이미 월 계획으로 확보된 금액으로 보고 중복 차감하지 않음.
+  const futureMust=unpaidFixed+miscPlanRemaining;
 
-  // 사용가능한 금액 = 현재 남는 돈 - 앞으로 꼭 나갈 금액
-  const available=summary.balance-futureMust;
+  let income=0;
+  Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
 
-  return {futureMust,available,miscPlanRemaining};
+  // 사용가능 = 수입 - 이미 실제로 나간 금액 - 앞으로 반드시 남겨둘 금액
+  const alreadySpent=paidFixed+miscActual+investActual;
+  const available=income-alreadySpent-futureMust;
+
+  return {
+    futureMust,
+    available,
+    miscPlanRemaining,
+    paidFixed,
+    unpaidFixed,
+    alreadySpent
+  };
 }
 
 function updateSummary(){
   const d=loadData();
-  let inc=0,misc=0,inv=0,sav=0;
-  Object.values(d.income).forEach(v=>inc+=Number(v)||0);
-
-  const parts=fixedSummaryParts(d);
-
-  d.misc.forEach(r=>misc+=Number(r.amount)||0);
-  d.invest.forEach(r=>inv+=Number(r.amount)||0);
-  Object.values(d.saving).forEach(v=>sav+=Number(v)||0);
-
-  const exp=
-    parts.loans+
-    parts.utilities+
-    parts.insurance+
-    parts.academy+
-    parts.otherFixed+
-    misc+inv+sav;
-
-  const bal=inc-exp;
-
-  sumIncome.textContent=rIncome.textContent=won(inc);
-  sumExpense.textContent=won(exp);
-
-  sumLoans.textContent=rLoans.textContent=won(parts.loans);
-  sumUtilities.textContent=rUtilities.textContent=won(parts.utilities);
-  sumInsurance.textContent=rInsurance.textContent=won(parts.insurance);
-  sumAcademy.textContent=rAcademy.textContent=won(parts.academy);
-
-  sumMisc.textContent=rMisc.textContent=won(misc);
-  sumMiscPlan.textContent=rMiscPlan.textContent=won(MISC_MONTHLY_PLAN);
-  sumInvest.textContent=rInvest.textContent=won(inv);
-  sumSaving.textContent=rSaving.textContent=won(sav);
-  sumBalance.textContent=rBalance.textContent=won(bal);
-
+  const s=calcMonthSummary(d);
   const fa=calcFutureMustAndAvailable(d);
+
+  sumIncome.textContent=rIncome.textContent=won(s.income);
+  sumExpense.textContent=won(s.expense);
+
+  sumLoans.textContent=rLoans.textContent=won(s.loans);
+  sumUtilities.textContent=rUtilities.textContent=won(s.utilities);
+  sumInsurance.textContent=rInsurance.textContent=won(s.insurance);
+  sumAcademy.textContent=rAcademy.textContent=won(s.academy);
+
+  sumMisc.textContent=rMisc.textContent=won(s.misc);
+  if(typeof sumMiscPlan!=='undefined') sumMiscPlan.textContent=won(MISC_MONTHLY_PLAN);
+  if(typeof rMiscPlan!=='undefined') rMiscPlan.textContent=won(MISC_MONTHLY_PLAN);
+
+  sumInvest.textContent=rInvest.textContent=won(s.invest);
+  sumSaving.textContent=rSaving.textContent=won(s.saving);
+
+  sumBalance.textContent=rBalance.textContent=won(s.balance);
   sumFutureMust.textContent=rFutureMust.textContent=won(fa.futureMust);
   sumAvailable.textContent=rAvailable.textContent=won(fa.available);
 
@@ -904,7 +902,8 @@ function updateSummary(){
   rFutureMustRow.classList.toggle('alert-over-50k',futureAlert);
 
   sumAvailable.className=rAvailable.className=fa.available<0?'bad':'good';
-  sumBalance.className=rBalance.className=bal<0?'bad':'good';
+  sumBalance.className=rBalance.className=s.balance<0?'bad':'good';
+
   renderComparison();
 }
 function renderDebts(){
