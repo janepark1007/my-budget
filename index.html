@@ -111,7 +111,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-수입예정460만</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-보험40부업15</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -474,6 +474,8 @@ const fixedMasterKey='mybudget_fixed_master';
 const scheduleMasterKey='mybudget_schedule_master';
 const MISC_MONTHLY_PLAN=500000;
 const INCOME_MONTHLY_PLAN=4600000;
+const INSURANCE_MONTHLY_PLAN=400000;
+const INVEST_MONTHLY_PLAN=150000;
 function candidateMonthKeys(){
   const y=yearEl.value, m=monthEl.value;
   return [
@@ -702,10 +704,11 @@ function calcMonthSummary(d){
 
   // 메인 아래 지출 상세를 전부 더한 값과 정확히 동일한 이번달 예정지출.
   const plannedExpense=
-    fixedTotal+
-    misc+
-    miscRemaining+
-    invest+
+    (fixedTotal - parts.insurance) +
+    INSURANCE_MONTHLY_PLAN +
+    misc +
+    miscRemaining +
+    INVEST_MONTHLY_PLAN +
     saving;
 
   // 현재까지 실제로 결제/사용된 금액.
@@ -716,7 +719,7 @@ function calcMonthSummary(d){
 
   // 가장 중요한 최종식:
   // 이번달 사용가능한 돈 = 총수입 - 이번달 예정지출
-  const available=income-plannedExpense;
+  const available=INCOME_MONTHLY_PLAN-plannedExpense;
   const balance=available;
 
   return {
@@ -1043,7 +1046,7 @@ function updateSummary(){
   // 통합 메인표: 모든 메인 통계를 이 표 하나에 표시
   setTextIf('tblIncomePlan',won(INCOME_MONTHLY_PLAN));
   setTextIf('tblIncome',won(s.income));
-  setTextIf('tblPlannedExpense',won(s.plannedExpense));
+  setTextIf('tblPlannedExpense',won(planCompareTotal));
   setTextIf('tblActualExpense',won(s.actualExpense));
   setTextIf('tblRemainingExpense',won(s.remainingExpense));
 
@@ -1053,7 +1056,7 @@ function updateSummary(){
   setTextIf('cmpUtilityPlan',won(s.utilities));
   setTextIf('cmpUtilityActual',won(actualFixed.utilities));
 
-  setTextIf('cmpInsurancePlan',won(s.insurance));
+  setTextIf('cmpInsurancePlan',won(INSURANCE_MONTHLY_PLAN));
   setTextIf('cmpInsuranceActual',won(actualFixed.insurance));
 
   setTextIf('cmpAcademyPlan',won(s.academy));
@@ -1062,15 +1065,20 @@ function updateSummary(){
   setTextIf('cmpMiscPlan',won(MISC_MONTHLY_PLAN));
   setTextIf('cmpMiscActual',won(s.misc));
 
-  setTextIf('cmpInvestPlan',won(s.invest));
+  setTextIf('cmpInvestPlan',won(INVEST_MONTHLY_PLAN));
   setTextIf('cmpInvestActual',won(s.invest));
 
   setTextIf('cmpSavingPlan',won(s.saving));
   setTextIf('cmpSavingActual',won(0));
 
   const planCompareTotal =
-    s.loans+s.utilities+s.insurance+s.academy+
-    MISC_MONTHLY_PLAN+s.invest+s.saving;
+    s.loans+
+    s.utilities+
+    INSURANCE_MONTHLY_PLAN+
+    s.academy+
+    MISC_MONTHLY_PLAN+
+    INVEST_MONTHLY_PLAN+
+    s.saving;
 
   const actualCompareTotal =
     actualFixed.loans+actualFixed.utilities+actualFixed.insurance+
@@ -1079,8 +1087,9 @@ function updateSummary(){
   setTextIf('cmpPlanTotal',won(planCompareTotal));
   setTextIf('cmpActualTotal',won(actualCompareTotal));
 
-  setTextIf('tblAvailable',won(s.available));
-  setTextIf('tblBalance',won(s.balance));
+  const finalAvailable=INCOME_MONTHLY_PLAN-planCompareTotal;
+  setTextIf('tblAvailable',won(finalAvailable));
+  setTextIf('tblBalance',won(finalAvailable));
 
   // 남은 예정지출 5만원 초과 시 적색 강조
   const remain=document.getElementById('tblRemainingExpense');
@@ -1089,7 +1098,7 @@ function updateSummary(){
   }
   const avail=document.getElementById('tblAvailable');
   if(avail){
-    avail.className='compare-amount ' + (s.available<0 ? 'bad' : 'good');
+    avail.className='compare-amount ' + (finalAvailable<0 ? 'bad' : 'good');
   }
 }
 function renderDebts(){
