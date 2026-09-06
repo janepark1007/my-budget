@@ -79,7 +79,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-보험합산수정</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-예정실제분리</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -87,10 +87,12 @@
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
-  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>계산기준:</b> 총지출은 현재 잡힌 지출만 합산하고, 생활비·기타 예정 50만원은 앞으로 나갈 금액에서만 반영합니다.</div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
+  <section id="home" class="page active"><div class="note" style="margin-top:10px"><b>계산기준:</b> 예정지출 = 이번 달 전체 계획금액 · 실제지출 = 결제완료된 고정지출 + 실제 기타/부업지출 · 남은 예정지출 = 아직 결제 안 된 고정지출 + 남은 생활비 50만원 + 적금입니다.</div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
     <div class="cards">
       <div class="card"><small>총수입</small><b id="sumIncome">0원</b></div>
-      <div class="card"><small>총지출</small><b id="sumExpense">0원</b></div>
+      <div class="card"><small>이번달 예정지출</small><b id="sumExpense">0원</b></div>
+      <div class="card"><small>현재까지 실제지출</small><b id="sumActualExpense">0원</b></div>
+      <div class="card" id="futureMustCard"><small>남은 예정지출</small><b id="sumFutureMust">0원</b></div>
       <div class="card"><small>대출지출 총금액</small><b id="sumLoans">0원</b></div>
       <div class="card"><small>공과금</small><b id="sumUtilities">0원</b></div>
       <div class="card"><small>보험지출 총금액</small><b id="sumInsurance">0원</b></div>
@@ -99,12 +101,13 @@
       <div class="card"><small>생활비·기타 예정금액</small><b id="sumMiscPlan">500,000원</b></div>
       <div class="card"><small>부업 투자지출</small><b id="sumInvest">0원</b></div>
       <div class="card"><small>적금</small><b id="sumSaving">0원</b></div>
-      <div class="card" id="futureMustCard"><small>앞으로 꼭 나갈 금액</small><b id="sumFutureMust">0원</b></div>
       <div class="card"><small>이번달 사용가능한 돈</small><b id="sumAvailable">0원</b></div>
       <div class="card wide"><small>이번 달 남는 돈</small><b id="sumBalance">0원</b></div>
     </div>
     <div class="section"><h2>이번 달 정리</h2>
       <div class="sum"><span>수입</span><b id="rIncome">0원</b></div>
+      <div class="sum"><span>이번달 예정지출</span><b id="rPlannedExpense">0원</b></div>
+      <div class="sum"><span>현재까지 실제지출</span><b id="rActualExpense">0원</b></div>
       <div class="sum"><span>대출지출</span><b id="rLoans">0원</b></div>
       <div class="sum"><span>공과금</span><b id="rUtilities">0원</b></div>
       <div class="sum"><span>보험지출</span><b id="rInsurance">0원</b></div>
@@ -113,7 +116,7 @@
       <div class="sum"><span>생활비·기타 예정금액</span><b id="rMiscPlan">500,000원</b></div>
       <div class="sum"><span>부업 투자지출</span><b id="rInvest">0원</b></div>
       <div class="sum"><span>적금</span><b id="rSaving">0원</b></div>
-      <div class="sum" id="rFutureMustRow"><span>앞으로 꼭 나갈 금액</span><b id="rFutureMust">0원</b></div>
+      <div class="sum" id="rFutureMustRow"><span>남은 예정지출</span><b id="rFutureMust">0원</b></div>
       <div class="sum"><span>이번달 사용가능한 돈</span><b id="rAvailable">0원</b></div>
       <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
     </div>
@@ -510,69 +513,80 @@ function readMonthData(y,m){
 function fixedSummaryParts(d){
   let loans=0, utilities=0, insurance=0, academy=0, otherFixed=0;
 
-  getFixedItems().forEach(([cat,n])=>{
-    const amount=Number(d.fixed?.[n]?.amount)||0;
-    const c=String(cat||'').trim();
-    const name=String(n||'').trim();
+  const master=loadFixedMaster();
+  const defaultCats={};
+  defaultFixedItems.forEach(([cat,name])=>defaultCats[name]=cat);
 
-    const isLoan =
-      c.includes('대출') ||
-      name.includes('대출') ||
-      name.includes('디딤돌') ||
-      name.includes('오케이') ||
-      name.includes('롯데');
-
-    const isUtility =
-      c.includes('공과금') ||
-      ['가스','전기','관리비','재산세'].some(x=>name.includes(x));
-
-    const isInsurance = c.includes('보험') || name.includes('보험');
-
-    const isAcademy =
-      c.includes('교육') || c.includes('학원') ||
-      name.includes('웅진씽크빅') || name.includes('웅진씽빅') ||
-      name.includes('학원');
-
-    if(isLoan) loans += amount;
-    else if(isUtility) utilities += amount;
-    else if(isInsurance) insurance += amount;
-    else if(isAcademy) academy += amount;
-    else otherFixed += amount;
-  });
-
-  // master/기본목록에 없는 예전 데이터라도 이름에 '보험'이 있으면 보험 합계에 포함
+  // 실제 월 데이터(d.fixed)를 기준으로 전부 순회한다.
+  // 이렇게 해야 master 목록에 누락되어도 한화보험 등 현재 저장된 보험금액이 메인에 표시된다.
   Object.entries(d.fixed||{}).forEach(([name,r])=>{
-    const exists=getFixedItems().some(([,n])=>n===name);
-    if(exists) return;
     const amount=Number(r?.amount)||0;
-    if(String(name).includes('보험')) insurance+=amount;
+    const cat=String(master?.[name]?.category || defaultCats[name] || '').trim();
+    const nm=String(name||'').trim();
+
+    const isInsurance = cat.includes('보험') || nm.includes('보험');
+    const isUtility =
+      cat.includes('공과금') ||
+      ['가스','전기','관리비','재산세'].some(x=>nm.includes(x));
+    const isAcademy =
+      cat.includes('교육') || cat.includes('학원') ||
+      nm.includes('웅진씽크빅') || nm.includes('웅진씽빅') || nm.includes('학원');
+    const isLoan =
+      cat.includes('대출') ||
+      nm.includes('대출') || nm.includes('디딤돌') ||
+      nm.includes('오케이') || nm.includes('롯데');
+
+    // 보험을 가장 먼저 판별해서 다른 분류로 빠지는 것을 방지
+    if(isInsurance) insurance += amount;
+    else if(isUtility) utilities += amount;
+    else if(isAcademy) academy += amount;
+    else if(isLoan) loans += amount;
+    else otherFixed += amount;
   });
 
   return {loans,utilities,insurance,academy,otherFixed};
 }
 
 function calcMonthSummary(d){
-  if(!d) return {income:0,loans:0,utilities:0,insurance:0,academy:0,otherFixed:0,misc:0,invest:0,saving:0,expense:0,balance:0};
+  if(!d) return {
+    income:0,loans:0,utilities:0,insurance:0,academy:0,otherFixed:0,
+    misc:0,invest:0,saving:0,plannedExpense:0,actualExpense:0,
+    remainingExpense:0,balance:0,available:0
+  };
   d=migrateShape(d);
 
   let income=0,misc=0,invest=0,saving=0;
+  let paidFixed=0,unpaidFixed=0;
+
   Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
-
-  const parts=fixedSummaryParts(d);
-
   (d.misc||[]).forEach(r=>misc+=Number(r.amount)||0);
   (d.invest||[]).forEach(r=>invest+=Number(r.amount)||0);
   Object.values(d.saving||{}).forEach(v=>saving+=Number(v)||0);
 
-  // 총지출 = 이번 달에 잡혀 있는 지출 합계.
-  // 생활비·기타 예정 50만원은 '예정금액'이므로 총지출에는 넣지 않음.
-  const expense=
-    parts.loans+
-    parts.utilities+
-    parts.insurance+
-    parts.academy+
-    parts.otherFixed+
-    misc+invest+saving;
+  Object.values(d.fixed||{}).forEach(r=>{
+    const amount=Number(r?.amount)||0;
+    if(r?.paid) paidFixed+=amount;
+    else unpaidFixed+=amount;
+  });
+
+  const parts=fixedSummaryParts(d);
+  const fixedTotal=parts.loans+parts.utilities+parts.insurance+parts.academy+parts.otherFixed;
+
+  // 생활비·기타는 월 50만원 예산. 실제 사용액이 50만원을 넘으면 실제 사용액을 기준으로 계획액도 늘림.
+  const miscPlanned=Math.max(MISC_MONTHLY_PLAN,misc);
+  const miscRemaining=Math.max(MISC_MONTHLY_PLAN-misc,0);
+
+  // 이번 달 전체 계획
+  const plannedExpense=fixedTotal + miscPlanned + invest + saving;
+
+  // 실제로 지금까지 나간 돈
+  const actualExpense=paidFixed + misc + invest;
+
+  // 앞으로 남아 있는 계획금액
+  const remainingExpense=unpaidFixed + miscRemaining + saving;
+
+  const balance=income-plannedExpense;
+  const available=income-actualExpense-remainingExpense;
 
   return {
     income,
@@ -581,8 +595,11 @@ function calcMonthSummary(d){
     insurance:parts.insurance,
     academy:parts.academy,
     otherFixed:parts.otherFixed,
-    misc,invest,saving,expense,
-    balance:income-expense
+    misc,invest,saving,
+    plannedExpense,actualExpense,remainingExpense,
+    expense:plannedExpense,
+    balance,available,
+    paidFixed,unpaidFixed,miscRemaining
   };
 }
 function renderComparison(){
@@ -854,51 +871,26 @@ function renderInvest(){
 }
 
 function calcFutureMustAndAvailable(d){
-  let unpaidFixed=0;
-  let paidFixed=0;
-  let miscActual=0;
-  let investActual=0;
-
-  Object.entries(d.fixed||{}).forEach(([name,r])=>{
-    const amount=Number(r?.amount)||0;
-    if(r?.paid) paidFixed+=amount;
-    else unpaidFixed+=amount;
-  });
-
-  (d.misc||[]).forEach(r=>miscActual+=Number(r.amount)||0);
-  (d.invest||[]).forEach(r=>investActual+=Number(r.amount)||0);
-
-  // 생활비·기타 예정 50만원 중 이미 실제로 쓴 기타지출을 뺀 남은 예정액
-  const miscPlanRemaining=Math.max(MISC_MONTHLY_PLAN-miscActual,0);
-
-  // 적금은 월 지출 합계에는 포함하지만, 아직 따로 '납입완료' 체크가 없으므로
-  // 이번달 사용가능한 돈 계산에서는 이미 월 계획으로 확보된 금액으로 보고 중복 차감하지 않음.
-  const futureMust=unpaidFixed+miscPlanRemaining;
-
-  let income=0;
-  Object.values(d.income||{}).forEach(v=>income+=Number(v)||0);
-
-  // 사용가능 = 수입 - 이미 실제로 나간 금액 - 앞으로 반드시 남겨둘 금액
-  const alreadySpent=paidFixed+miscActual+investActual;
-  const available=income-alreadySpent-futureMust;
-
+  const s=calcMonthSummary(d);
   return {
-    futureMust,
-    available,
-    miscPlanRemaining,
-    paidFixed,
-    unpaidFixed,
-    alreadySpent
+    futureMust:s.remainingExpense,
+    available:s.available,
+    miscPlanRemaining:s.miscRemaining,
+    paidFixed:s.paidFixed,
+    unpaidFixed:s.unpaidFixed,
+    alreadySpent:s.actualExpense
   };
 }
 
 function updateSummary(){
   const d=loadData();
   const s=calcMonthSummary(d);
-  const fa=calcFutureMustAndAvailable(d);
 
   sumIncome.textContent=rIncome.textContent=won(s.income);
-  sumExpense.textContent=won(s.expense);
+  sumExpense.textContent=won(s.plannedExpense);
+  sumActualExpense.textContent=won(s.actualExpense);
+  rPlannedExpense.textContent=won(s.plannedExpense);
+  rActualExpense.textContent=won(s.actualExpense);
 
   sumLoans.textContent=rLoans.textContent=won(s.loans);
   sumUtilities.textContent=rUtilities.textContent=won(s.utilities);
@@ -913,14 +905,14 @@ function updateSummary(){
   sumSaving.textContent=rSaving.textContent=won(s.saving);
 
   sumBalance.textContent=rBalance.textContent=won(s.balance);
-  sumFutureMust.textContent=rFutureMust.textContent=won(fa.futureMust);
-  sumAvailable.textContent=rAvailable.textContent=won(fa.available);
+  sumFutureMust.textContent=rFutureMust.textContent=won(s.remainingExpense);
+  sumAvailable.textContent=rAvailable.textContent=won(s.available);
 
-  const futureAlert=fa.futureMust>50000;
+  const futureAlert=s.remainingExpense>50000;
   futureMustCard.classList.toggle('alert-over-50k',futureAlert);
   rFutureMustRow.classList.toggle('alert-over-50k',futureAlert);
 
-  sumAvailable.className=rAvailable.className=fa.available<0?'bad':'good';
+  sumAvailable.className=rAvailable.className=s.available<0?'bad':'good';
   sumBalance.className=rBalance.className=s.balance<0?'bad':'good';
 
   renderComparison();
