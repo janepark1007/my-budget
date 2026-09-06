@@ -55,12 +55,16 @@
       <div class="sum"><span>적금</span><b id="rSaving">0원</b></div>
       <div class="sum"><span>남는 돈</span><b id="rBalance">0원</b></div>
     </div>
-    <div class="note">기존 버전에서 입력한 내용도 같은 브라우저에 남아 있으면 자동으로 찾아서 현재 월 저장 형식으로 옮겨옵니다.</div>
+    <div class="note">기존 입력값은 같은 브라우저에서 자동 복구합니다. 고정지출은 별도 영구저장되어 웹 파일을 업데이트해도 유지됩니다.</div>
   </section>
 
   <section id="fixedPage" class="page">
     <div class="section"><h2>수입</h2><div id="incomeList"></div></div>
-    <div class="section"><h2>고정지출 <button id="togglePaid" class="smallbtn">결제완료 보기</button></h2><div id="fixedList"></div></div>
+    <div class="section">
+      <h2>고정지출 <span><button id="saveFixed" class="smallbtn">고정지출 저장</button> <button id="togglePaid" class="smallbtn">결제완료 보기</button></span></h2>
+      <div id="fixedSaveStatus" class="sub" style="margin-bottom:8px">입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.</div>
+      <div id="fixedList"></div>
+    </div>
     <div class="section">
       <h2>부업 투자지출</h2><div class="sub">장비, 광고비, 재료비, 프로그램·구독료 등</div>
       <div id="investList"></div>
@@ -114,8 +118,9 @@ for(let m=1;m<=12;m++){const o=document.createElement('option');o.value=m;o.text
 yearEl.value=now.getFullYear();monthEl.value=now.getMonth()+1;
 
 let showPaid=false;
-const storageKey=()=>`budget6_${yearEl.value}_${monthEl.value}`;
-const debtKey='budget6_debts';
+const storageKey=()=>`mybudget_month_${yearEl.value}_${monthEl.value}`;
+const debtKey='mybudget_debts';
+const fixedMasterKey='mybudget_fixed_master';
 const won=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
 const onlyNumber=v=>Number(String(v??'').replace(/,/g,'').replace(/[^0-9]/g,''))||0;
 const formatInput=v=>{const s=String(v??'').replace(/,/g,'').replace(/[^0-9]/g,'');return s?Number(s).toLocaleString('ko-KR'):''};
@@ -133,25 +138,44 @@ function migrateShape(d){
 }
 function loadData(){
   const current=localStorage.getItem(storageKey());
-  if(current){try{return seedDefaults(migrateShape(JSON.parse(current)))}catch(e){}}
+  if(current){try{return seedDefaults(applyFixedMaster(migrateShape(JSON.parse(current))))}catch(e){}}
   const m=monthEl.value, y=yearEl.value;
   const oldKeys=[
-    `budget5_${y}_${m}`,`budget_v5_${m}`,`budget4_${m}`,`budget_v3_${m}`,`budget_v2_${m}`,
+    `budget6_${y}_${m}`,`budget5_${y}_${m}`,
+    `budget_v5_${m}`,`budget4_${m}`,`budget_v3_${m}`,`budget_v2_${m}`,
     `household_budget_${m}`
   ];
   for(const k of oldKeys){
     const raw=localStorage.getItem(k);
     if(raw){
       try{
-        const d=seedDefaults(migrateShape(JSON.parse(raw)));
+        const d=seedDefaults(applyFixedMaster(migrateShape(JSON.parse(raw))));
         localStorage.setItem(storageKey(),JSON.stringify(d));
         return d;
       }catch(e){}
     }
   }
-  const d=seedDefaults(emptyData()); localStorage.setItem(storageKey(),JSON.stringify(d)); return d;
+  const d=seedDefaults(applyFixedMaster(emptyData())); localStorage.setItem(storageKey(),JSON.stringify(d)); return d;
 }
 function saveData(d){localStorage.setItem(storageKey(),JSON.stringify(migrateShape(d)))}
+function loadFixedMaster(){
+  try{return JSON.parse(localStorage.getItem(fixedMasterKey)||'{}')}catch(e){return {}}
+}
+function saveFixedMaster(fixed){
+  localStorage.setItem(fixedMasterKey,JSON.stringify(fixed||{}));
+}
+function applyFixedMaster(d){
+  const master=loadFixedMaster();
+  d.fixed=d.fixed||{};
+  fixedItems.forEach(([,n])=>{
+    if(!d.fixed[n]) d.fixed[n]={};
+    const m=master[n]||{};
+    if((d.fixed[n].amount===undefined || d.fixed[n].amount===null || d.fixed[n].amount==='') && m.amount!==undefined) d.fixed[n].amount=m.amount;
+    if(!d.fixed[n].bank && m.bank) d.fixed[n].bank=m.bank;
+  });
+  return d;
+}
+
 function seedDefaults(d){
   if(!d.seeded){
     miscDefaults.forEach(name=>{if(!d.misc.some(x=>x.name===name))d.misc.push({date:'',name,amount:0,memo:''})});
@@ -187,10 +211,10 @@ function renderAll(){
   fixedItems.forEach(([cat,n])=>{
     const r=d.fixed[n]||{};
     fixedList.appendChild(makeMoneyRow(n,cat,r.amount,r.paid,
-      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),amount:v};saveData(x);updateSummary()},
+      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),amount:v};saveData(x);const master=loadFixedMaster();master[n]={...(master[n]||{}),amount:v,bank:x.fixed[n].bank||master[n]?.bank||''};saveFixedMaster(master);updateSummary()},
       ()=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),paid:!x.fixed[n]?.paid};saveData(x);renderAll()},
       true,r.bank,
-      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),bank:v};saveData(x)}
+      v=>{const x=loadData();x.fixed[n]={...(x.fixed[n]||{}),bank:v};saveData(x);const master=loadFixedMaster();master[n]={...(master[n]||{}),bank:v,amount:x.fixed[n].amount??master[n]?.amount??0};saveFixedMaster(master)}
     ));
   });
   savingList.appendChild(makeMoneyRow('한화적금','적금',d.saving['한화적금'],false,
@@ -256,9 +280,22 @@ function updateDebtSummary(){
   debtTotal.textContent=won(a);debtMin.textContent=won(b);debtExtra.textContent=won(c);
 }
 
+
+saveFixed.onclick=()=>{
+  const d=loadData();
+  const master={};
+  fixedItems.forEach(([,n])=>{
+    const r=d.fixed[n]||{};
+    master[n]={amount:Number(r.amount)||0,bank:r.bank||''};
+  });
+  saveFixedMaster(master);
+  fixedSaveStatus.textContent='✅ 고정지출이 영구저장되었습니다. 다음 달과 웹 업데이트 후에도 불러옵니다.';
+  setTimeout(()=>{fixedSaveStatus.textContent='입력 즉시 자동저장되며, 저장 버튼을 누르면 다음 달 기본값으로도 유지됩니다.'},3500);
+};
+
 togglePaid.onclick=()=>{showPaid=!showPaid;togglePaid.textContent=showPaid?'결제완료 숨기기':'결제완료 보기';renderAll()};
 yearEl.onchange=renderAll;monthEl.onchange=renderAll;
-resetMonth.onclick=()=>{if(confirm(`${yearEl.value}년 ${monthEl.value}월 입력 내용을 초기화할까요?`)){localStorage.removeItem(storageKey());renderAll()}};
+resetMonth.onclick=()=>{if(confirm(`${yearEl.value}년 ${monthEl.value}월 입력 내용을 초기화할까요?\n고정지출 기본저장값은 삭제되지 않습니다.`)){localStorage.removeItem(storageKey());renderAll()}};
 miscAmount.addEventListener('input',()=>miscAmount.value=formatInput(miscAmount.value));
 addMisc.onclick=()=>{if(!miscName.value.trim())return alert('지출 항목을 입력하세요.');const d=loadData();d.misc.push({date:miscDate.value||'',name:miscName.value.trim(),amount:onlyNumber(miscAmount.value),memo:miscMemo.value.trim()});saveData(d);miscDate.value='';miscName.value='';miscAmount.value='';miscMemo.value='';renderMisc();updateSummary()};
 investAmount.addEventListener('input',()=>investAmount.value=formatInput(investAmount.value));
