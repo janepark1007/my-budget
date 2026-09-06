@@ -111,7 +111,7 @@
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-부업예정15만</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-동기화오류수정</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -435,7 +435,7 @@ localStorage.setItem=function(k,v){
   if(isBudgetKey(k)) queueCloudSave();
 };
 
-localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-색상구분');
+localStorage.setItem('mybudget_app_version','2026.09.07-CLOUD2-동기화오류수정');
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
 const defaultFixedItems=[
 ['대출','디딤돌'],['대출','신용대출'],['대출','우리대출'],['대출','오케이대출1'],['대출','오케이대출2'],['대출','롯데대출'],
@@ -1042,7 +1042,27 @@ function updateSummary(){
   const s=calcMonthSummary(d);
   const actualFixed=fixedActualParts(d);
 
-  // 통합 메인표: 모든 메인 통계를 이 표 하나에 표시
+  // 먼저 예정지출 합계를 계산한 뒤 화면에 표시해야 함.
+  const planCompareTotal =
+    s.loans+
+    s.utilities+
+    INSURANCE_MONTHLY_PLAN+
+    s.academy+
+    MISC_MONTHLY_PLAN+
+    INVEST_MONTHLY_PLAN+
+    s.saving;
+
+  const actualCompareTotal =
+    actualFixed.loans+
+    actualFixed.utilities+
+    actualFixed.insurance+
+    actualFixed.academy+
+    s.misc+
+    s.invest;
+
+  const finalAvailable=INCOME_MONTHLY_PLAN-planCompareTotal;
+
+  // 통합 메인표
   setTextIf('tblIncomePlan',won(INCOME_MONTHLY_PLAN));
   setTextIf('tblIncome',won(s.income));
   setTextIf('tblPlannedExpense',won(planCompareTotal));
@@ -1070,27 +1090,12 @@ function updateSummary(){
   setTextIf('cmpSavingPlan',won(s.saving));
   setTextIf('cmpSavingActual',won(0));
 
-  const planCompareTotal =
-    s.loans+
-    s.utilities+
-    INSURANCE_MONTHLY_PLAN+
-    s.academy+
-    MISC_MONTHLY_PLAN+
-    INVEST_MONTHLY_PLAN+
-    s.saving;
-
-  const actualCompareTotal =
-    actualFixed.loans+actualFixed.utilities+actualFixed.insurance+
-    actualFixed.academy+s.misc+s.invest;
-
   setTextIf('cmpPlanTotal',won(planCompareTotal));
   setTextIf('cmpActualTotal',won(actualCompareTotal));
 
-  const finalAvailable=INCOME_MONTHLY_PLAN-planCompareTotal;
   setTextIf('tblAvailable',won(finalAvailable));
   setTextIf('tblBalance',won(finalAvailable));
 
-  // 남은 예정지출 5만원 초과 시 적색 강조
   const remain=document.getElementById('tblRemainingExpense');
   if(remain){
     remain.className='compare-amount' + (s.remainingExpense>50000 ? ' bad' : '');
