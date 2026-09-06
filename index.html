@@ -46,7 +46,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo"
     <div class="section"><h2>기본지출 · 수동입력</h2>
       <div class="sub" style="margin-bottom:8px">예: 식비, 교통비, 주유비, 병원비, 쇼핑, 용돈</div>
       <div id="basicList"></div>
-      <div class="add"><input id="basicName" placeholder="항목"><input id="basicAmount" type="number" inputmode="numeric" placeholder="금액"><button id="addBasic">추가</button></div>
+      <div class="add"><input id="basicName" placeholder="항목"><input id="basicAmount" type="text" inputmode="numeric" placeholder="금액"><button id="addBasic">추가</button></div>
     </div>
   </section>
 
@@ -94,8 +94,8 @@ function renderBasic(){
     name.oninput=()=>{let x=load();x.basic[i].name=name.value;save(x)};
 
     let inp=document.createElement('input');
-    inp.className='money';inp.type='number';inp.inputMode='numeric';inp.value=r.amount||'';inp.placeholder='0';
-    inp.oninput=()=>{let x=load();x.basic[i].amount=Number(inp.value||0);save(x);summary()};
+    inp.className='money';inp.value=r.amount||'';inp.placeholder='0';
+    bindComma(inp,v=>{let x=load();x.basic[i].amount=v;save(x);summary()});
 
     let del=document.createElement('button');
     del.className='del';del.textContent='×';
@@ -109,13 +109,14 @@ function renderBasic(){
     basicList.appendChild(w);
   })
 }
+basicAmount.addEventListener('input',()=>{basicAmount.value=fmtInput(basicAmount.value)});
 addBasic.onclick=()=>{
   if(!basicName.value.trim())return alert('지출 항목을 입력하세요.');
   let d=load();
   d.basic.push({
     date:basicDate.value||'',
     name:basicName.value.trim(),
-    amount:Number(basicAmount.value||0),
+    amount:numOnly(basicAmount.value),
     memo:basicMemo.value.trim(),
     paid:true
   });
@@ -126,7 +127,7 @@ addBasic.onclick=()=>{
 function summary(){let d=load(),inc=0,fx=0,bs=0,sv=0,un=0;Object.values(d.income).forEach(v=>inc+=+v||0);fixed.forEach(([c,n])=>{let r=d.fixed[n]||{};fx+=+r.amount||0;if(!r.paid)un++});Object.values(d.saving).forEach(v=>sv+=+v||0);d.basic.forEach(r=>bs+=+r.amount||0);let ex=fx+bs+sv,bal=inc-ex;tIncome.textContent=sIncome.textContent=won(inc);tExpense.textContent=won(ex);tFixed.textContent=sFixed.textContent=won(fx);tBasic.textContent=sBasic.textContent=won(bs);tSaving.textContent=sSaving.textContent=won(sv);tUnpaid.textContent=un+'건';tBalance.textContent=sBalance.textContent=won(bal);tBalance.className=sBalance.className=bal<0?'bad':'good'}
 showPaid.onclick=()=>{paidView=!paidView;showPaid.textContent=paidView?'결제완료 숨기기':'결제완료 보기';render()};month.onchange=render;reset.onclick=()=>{if(confirm(month.value+'월 입력값을 초기화할까요?')){localStorage.removeItem(key());render()}};
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.page).classList.add('active')});
-function renderDebt(){let d=JSON.parse(localStorage.getItem(debtKey)||'{}');debtList.innerHTML='';debts.forEach(n=>{let r=d[n]||{},box=document.createElement('div');box.innerHTML=`<div class="name" style="font-weight:700;margin-top:10px">${n}</div><div class="add" style="grid-template-columns:1fr 1fr"><input type="number" inputmode="numeric" placeholder="현재잔액" value="${r.balance||''}" data-n="${n}" data-f="balance"><input type="number" inputmode="decimal" placeholder="금리 %" value="${r.rate||''}" data-n="${n}" data-f="rate"><input type="number" inputmode="numeric" placeholder="최소상환" value="${r.min||''}" data-n="${n}" data-f="min"><input type="number" inputmode="numeric" placeholder="추가상환" value="${r.extra||''}" data-n="${n}" data-f="extra"></div>`;debtList.appendChild(box)});debtList.querySelectorAll('input').forEach(i=>i.oninput=()=>{let x=JSON.parse(localStorage.getItem(debtKey)||'{}');x[i.dataset.n]=x[i.dataset.n]||{};x[i.dataset.n][i.dataset.f]=Number(i.value||0);localStorage.setItem(debtKey,JSON.stringify(x));debtSummary()});debtSummary()}
+function renderDebt(){let d=JSON.parse(localStorage.getItem(debtKey)||'{}');debtList.innerHTML='';debts.forEach(n=>{let r=d[n]||{},box=document.createElement('div');box.innerHTML=`<div class="name" style="font-weight:700;margin-top:10px">${n}</div><div class="add" style="grid-template-columns:1fr 1fr"><input type="text" inputmode="numeric" class="comma-debt" placeholder="현재잔액" value="${fmtInput(r.balance||'')}" data-n="${n}" data-f="balance"><input type="number" inputmode="decimal" placeholder="금리 %" value="${r.rate||''}" data-n="${n}" data-f="rate"><input type="number" inputmode="numeric" placeholder="최소상환" value="${fmtInput(r.min||'')}" data-n="${n}" data-f="min"><input type="number" inputmode="numeric" placeholder="추가상환" value="${fmtInput(r.extra||'')}" data-n="${n}" data-f="extra"></div>`;debtList.appendChild(box)});debtList.querySelectorAll('input').forEach(i=>i.oninput=()=>{let x=JSON.parse(localStorage.getItem(debtKey)||'{}');x[i.dataset.n]=x[i.dataset.n]||{};x[i.dataset.n][i.dataset.f]=Number(i.value||0);localStorage.setItem(debtKey,JSON.stringify(x));debtSummary()});debtSummary()}
 function debtSummary(){let x=JSON.parse(localStorage.getItem(debtKey)||'{}'),a=0,b=0,c=0;debts.forEach(n=>{a+=+x[n]?.balance||0;b+=+x[n]?.min||0;c+=+x[n]?.extra||0});dTotal.textContent=won(a);dMin.textContent=won(b);dExtra.textContent=won(c)}
 render();renderDebt();
 </script></body></html>
