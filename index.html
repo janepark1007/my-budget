@@ -12,7 +12,7 @@
 :root{--navy:#203864;--bg:#f5f7fb;--card:#fff;--line:#e5e7eb;--yellow:#fff4cc;--green:#e8f5e9;--muted:#6b7280}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 .app{max-width:760px;margin:auto;padding:12px 12px 94px}.hero{background:var(--navy);color:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 20px #20386422}
-.hero h1{margin:0 0 6px;font-size:22px}.versionbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;opacity:.9}.refreshbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#fff;color:#203864}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
+.hero h1{margin:0 0 6px;font-size:22px}.versionbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;opacity:.9}.refreshbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#fff;color:#203864}.syncbar{display:flex;gap:7px;align-items:center;margin-top:8px}.syncstatus{font-size:11px;opacity:.95;flex:1}.syncbtn{border:0;border-radius:8px;padding:7px 9px;font-weight:800;background:#e8f5e9;color:#166534}.hero p{margin:0;font-size:13px;opacity:.9}.ym{display:grid;grid-template-columns:1fr 1fr auto;gap:7px;margin-top:12px}
 .ym select,.ym button{height:42px;border:0;border-radius:10px;padding:0 10px}.ym button{font-weight:800}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}.card,.section{background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 12px #0000000d}
 .card small{color:var(--muted)}.card b{display:block;font-size:20px;margin-top:4px}.wide{grid-column:1/-1;background:var(--green)}.wide b{font-size:25px}
@@ -68,7 +68,7 @@
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-01</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div>
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-02</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
@@ -159,6 +159,103 @@
 
 <script>
 'use strict';
+const CLOUD_API = 'https://script.google.com/macros/s/AKfycbzpmdsp_YFka2tFmxE_NsbHkwk5av68D5u91vO6zwW6D4THn2g2Gmep9q5iXosU8f1U/exec';
+let cloudReady = false;
+let cloudSaving = false;
+let cloudSaveTimer = null;
+let cloudLastLoadedAt = 0;
+
+function cloudKeys() {
+  const keys = [];
+  for (let i=0;i<localStorage.length;i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('mybudget_') || k.startsWith('budget6_') || k.startsWith('budget5_') || k.startsWith('budget4_') || k.startsWith('budget_v3_') || k.startsWith('household_budget_'))) {
+      keys.push(k);
+    }
+  }
+  return keys.sort();
+}
+
+function cloudSnapshotRows() {
+  const rows = [['key','json']];
+  cloudKeys().forEach(k => rows.push([k, localStorage.getItem(k) || '']));
+  return rows;
+}
+
+function setSyncStatus(msg, ok=true) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? '#d1fae5' : '#fecaca';
+}
+
+async function loadFromCloud(force=false) {
+  try {
+    if (!force && Date.now() - cloudLastLoadedAt < 3000) return;
+    setSyncStatus('클라우드 불러오는 중…');
+    const res = await fetch(CLOUD_API + '?action=load&_=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const rows = Array.isArray(data.summary) ? data.summary : [];
+    if (rows.length > 1) {
+      for (let i=1;i<rows.length;i++) {
+        const k = rows[i]?.[0], v = rows[i]?.[1];
+        if (k && typeof v === 'string' && v !== '') localStorage.setItem(k, v);
+      }
+    }
+    cloudReady = true;
+    cloudLastLoadedAt = Date.now();
+    setSyncStatus('✓ PC·모바일 동기화 완료');
+    try { renderAll(); renderDebts(); } catch(e) {}
+  } catch(err) {
+    cloudReady = false;
+    setSyncStatus('동기화 연결 확인 필요', false);
+    console.error('cloud load failed', err);
+  }
+}
+
+async function saveToCloud() {
+  if (cloudSaving) return;
+  cloudSaving = true;
+  try {
+    setSyncStatus('클라우드 저장 중…');
+    const payload = {
+      action:'save',
+      data:{
+        summary: cloudSnapshotRows(),
+        fixed: [],
+        misc: [],
+        invest: [],
+        debt: []
+      }
+    };
+    // Apps Script 웹앱은 POST 응답을 읽지 않아도 저장되도록 전송
+    await fetch(CLOUD_API, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(payload)
+    });
+    setSyncStatus('✓ 자동 저장됨');
+  } catch(err) {
+    setSyncStatus('저장 실패 - 다시 동기화', false);
+    console.error('cloud save failed', err);
+  } finally {
+    cloudSaving = false;
+  }
+}
+
+function queueCloudSave() {
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(saveToCloud, 700);
+}
+
+const _originalSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(k,v) {
+  _originalSetItem(k,v);
+  if (typeof k === 'string' && (k.startsWith('mybudget_') || k.startsWith('budget'))) queueCloudSave();
+};
+
 localStorage.setItem('mybudget_app_version','2026.09.07-01');
 const incomes=['나월급','신랑월급','부업','유튜브수입'];
 const defaultFixedItems=[
@@ -459,7 +556,20 @@ if(refreshBtn){
   };
 }
 
+
+const syncNowBtn=document.getElementById('syncNow');
+if(syncNowBtn){
+  syncNowBtn.onclick=async()=>{
+    await loadFromCloud(true);
+    await saveToCloud();
+  };
+}
+window.addEventListener('focus',()=>loadFromCloud(true));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadFromCloud(true)});
+window.addEventListener('online',()=>loadFromCloud(true));
+
 renderAll();renderDebts();
+setTimeout(()=>loadFromCloud(true),300);
 </script>
 </body>
 </html>
