@@ -89,13 +89,29 @@
   .compare-label{font-size:12px}
 }
 
+
+.compare-syncbar{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  margin:10px 0 14px;padding:10px 12px;
+  background:#fff;border:1px solid #e5e7eb;border-radius:12px
+}
+.compare-syncbar .syncstate{font-size:12px;color:#667085;margin-right:auto}
+.compare-syncbar button{
+  border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer
+}
+@media(max-width:600px){
+  .compare-syncbar{display:grid;grid-template-columns:1fr 1fr}
+  .compare-syncbar .syncstate{grid-column:1/-1}
+  .compare-syncbar button{width:100%}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
     <h1>별나다 월천 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-기본예정지출복구</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-CLOUD2-비교표동기화</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar">
       <span id="syncStatus" class="syncstatus">동기화 준비중</span>
       <button id="uploadThisDevice" class="syncbtn">PC 내용 기준으로 올리기</button>
       <button id="syncNow" class="syncbtn">클라우드 불러오기</button>
@@ -119,6 +135,13 @@
       <div class="compare-row"><div class="compare-label">적금</div><div class="compare-amount" id="cmpSavingPlan">0원</div><div class="compare-amount" id="cmpSavingActual">0원</div></div>
       <div class="compare-row compare-total"><div class="compare-label">합계</div><div class="compare-amount" id="cmpPlanTotal">0원</div><div class="compare-amount" id="cmpActualTotal">0원</div></div>
     </div>
+
+    <div class="compare-syncbar" id="compareSyncBar">
+      <span class="syncstate" id="compareSyncStatus">동기화 상태 확인중</span>
+      <button type="button" id="compareUpload">이 내용 클라우드에 올리기</button>
+      <button type="button" id="compareLoad">클라우드 내용 불러오기</button>
+    </div>
+
 
 <div class="note" style="margin-top:10px"><b>계산기준:</b> 이번달 예정지출은 아래 지출항목 전체 합계입니다. 기타지출을 사용하면 생활비·기타 예정 50만원에서 자동 차감됩니다. <b>이번달 사용가능한 돈 = 총수입 − 이번달 예정지출</b></div><div class="note" style="margin-top:10px"><b>PC·모바일 동기화:</b> 처음 한 번만 금액이 제대로 보이는 PC에서 <b>“PC 내용 기준으로 올리기”</b>를 누르세요. 이후 PC와 모바일은 같은 클라우드 데이터를 자동으로 사용합니다.</div>
     <div class="cards">
@@ -1186,6 +1209,33 @@ if(IS_LIVE_GITHUB){
   setSyncStatus('클라우드 확인 중…');
   setTimeout(()=>loadFromCloud(true),500);
 }
+
+// 메인 비교표 아래 동기화 바로가기
+(function(){
+  const up=document.getElementById('compareUpload');
+  const load=document.getElementById('compareLoad');
+  const mirror=document.getElementById('compareSyncStatus');
+  const originalStatus=document.getElementById('syncStatus');
+
+  if(up){
+    up.addEventListener('click',()=>{
+      const original=document.getElementById('uploadThisDevice');
+      if(original) original.click();
+    });
+  }
+  if(load){
+    load.addEventListener('click',()=>{
+      const original=document.getElementById('syncNow');
+      if(original) original.click();
+    });
+  }
+  if(mirror && originalStatus){
+    const copy=()=>{ mirror.textContent=originalStatus.textContent||'동기화 준비'; };
+    copy();
+    new MutationObserver(copy).observe(originalStatus,{childList:true,subtree:true,characterData:true});
+  }
+})();
+
 </script>
 </body>
 </html>
