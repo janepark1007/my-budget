@@ -68,7 +68,7 @@
 <div class="app">
   <div class="hero">
     <h1>우리집 빚갚는 가계부</h1>
-    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-02</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
+    <p>월별 저장 · 고정지출 은행 · 기타지출 · 부업 투자지출</p><div class="versionbar"><span>버전 2026.09.07-03</span><button id="forceRefresh" class="refreshbtn">최신화면 불러오기</button></div><div class="syncbar"><span id="syncStatus" class="syncstatus">동기화 준비중</span><button id="syncNow" class="syncbtn">지금 동기화</button></div>
     <div class="ym"><select id="year"></select><select id="month"></select><button id="resetMonth">초기화</button></div>
   </div>
 
@@ -159,6 +159,17 @@
 
 <script>
 'use strict';
+
+const IS_LIVE_GITHUB = /\.github\.io$/i.test(location.hostname) || location.hostname.includes('github.io');
+
+function previewNotice(){
+  const el=document.getElementById('syncStatus');
+  if(el && !IS_LIVE_GITHUB){
+    el.textContent='미리보기에서는 동기화 안 함 · GitHub 웹에서 자동동기화';
+    el.style.color='#dbeafe';
+  }
+}
+
 const CLOUD_API = 'https://script.google.com/macros/s/AKfycbzpmdsp_YFka2tFmxE_NsbHkwk5av68D5u91vO6zwW6D4THn2g2Gmep9q5iXosU8f1U/exec';
 let cloudReady = false;
 let cloudSaving = false;
@@ -190,6 +201,7 @@ function setSyncStatus(msg, ok=true) {
 }
 
 async function loadFromCloud(force=false) {
+  if(!IS_LIVE_GITHUB){previewNotice();return;}
   try {
     if (!force && Date.now() - cloudLastLoadedAt < 3000) return;
     setSyncStatus('클라우드 불러오는 중…');
@@ -215,6 +227,7 @@ async function loadFromCloud(force=false) {
 }
 
 async function saveToCloud() {
+  if(!IS_LIVE_GITHUB){previewNotice();return;}
   if (cloudSaving) return;
   cloudSaving = true;
   try {
@@ -560,16 +573,22 @@ if(refreshBtn){
 const syncNowBtn=document.getElementById('syncNow');
 if(syncNowBtn){
   syncNowBtn.onclick=async()=>{
+    if(!IS_LIVE_GITHUB){
+      previewNotice();
+      alert('여기 미리보기에서는 동기화하지 않습니다. GitHub 가계부 웹주소에서 사용하세요.');
+      return;
+    }
     await loadFromCloud(true);
     await saveToCloud();
   };
 }
-window.addEventListener('focus',()=>loadFromCloud(true));
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadFromCloud(true)});
-window.addEventListener('online',()=>loadFromCloud(true));
+window.addEventListener('focus',()=>{if(IS_LIVE_GITHUB)loadFromCloud(true)});
+document.addEventListener('visibilitychange',()=>{if(IS_LIVE_GITHUB && document.visibilityState==='visible')loadFromCloud(true)});
+window.addEventListener('online',()=>{if(IS_LIVE_GITHUB)loadFromCloud(true)});
 
 renderAll();renderDebts();
-setTimeout(()=>loadFromCloud(true),300);
+previewNotice();
+if(IS_LIVE_GITHUB)setTimeout(()=>loadFromCloud(true),300);
 </script>
 </body>
 </html>
